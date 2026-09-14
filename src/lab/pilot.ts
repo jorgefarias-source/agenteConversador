@@ -60,6 +60,15 @@ app.get('/v1/painel', (_req, res) => {
       <body>
         <h1>Painel de teste (modo piloto)</h1>
         <div class="row">
+          <h3>Enviar mensagem</h3>
+          <label>message_id: </label><input id="messageId" value="test-` + Date.now().toString() + `" size="26" />
+          <label>sender_id: </label><input id="senderId" value="remetente-demo-A" size="20" /><br/>
+          <label>channel_account_id: </label><input id="channelId" value="canal-demo" size="20" /><br/>
+          <label>texto: </label><br/>
+          <textarea id="text" rows="3" cols="68">cardápio</textarea><br/>
+          <button onclick="sendMessage()">POST /v1/messages</button>
+        </div>
+        <div class="row">
           <button onclick="ping()">GET /v1</button>
           <button onclick="state()">GET estado</button>
           <button onclick="claim()">Claim outbound</button>
@@ -84,6 +93,19 @@ app.get('/v1/painel', (_req, res) => {
             });
             const text = await r.text();
             try { return JSON.parse(text || '{}'); } catch { return { statusCode: r.status, text }; }
+          };
+          const sendMessage = async () => {
+            const payload = {
+              schema_version: '1',
+              message_id: document.getElementById('messageId').value || ('test-' + Date.now()),
+              channel_account_id: document.getElementById('channelId').value,
+              sender_id: document.getElementById('senderId').value,
+              sent_at: new Date().toISOString(),
+              type: 'text',
+              text: document.getElementById('text').value,
+            };
+            const response = await request('/v1/messages', 'POST', payload);
+            log(response);
           };
           const ping = async () => log(await request('/v1'));
           const state = async () => log(await request('/v1/observacao/state'));
