@@ -19,3 +19,5 @@ Observação final:
 - 2026-09-14T15:25:00Z: Iniciada persistência de Etapa 4 em memória local para produção simulada (`state/lab-state.json` via `AGENT_STATE_PATH`, sem commit do arquivo): inbound/outbox agora sobrevivem a reinício em modo lab/piloto/observação. `
 
 - 2026-09-14T15:35:00Z: Adicionados endpoints de estado persistido: /v1/observacao/state e /v1/observacao/state/reset em modos observação e piloto, com contadores de inbound/outbound e caminho do state file.
+
+- 2026-09-14T16:30:20Z: Passou smoke de persistência local (`npm run pilot:state:smoke`) em 127.0.0.1:3002. Estado persistido local em `state/lab-state.json` validado e reset endpoint funcionando.

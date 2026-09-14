@@ -8,6 +8,7 @@
     "observe": "tsx src/lab/observe.ts",
     "pilot": "tsx src/lab/pilot.ts",
     "pilot:smoke": "tsx src/lab/pilot-smoke.ts",
+    "pilot:state:smoke": "tsx src/lab/pilot-state-smoke.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/lab/engine.test.ts",
