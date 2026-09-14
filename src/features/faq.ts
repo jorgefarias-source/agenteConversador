@@ -20,7 +20,7 @@ function normalize(value: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -29,6 +29,53 @@ function tokenize(value: string): string[] {
   return normalize(value)
     .split(' ')
     .filter((token) => token.length > 2);
+}
+
+function compact(value: string): string {
+  return normalize(value).replace(/\s+/g, '');
+}
+
+function oneEditOrLessDistance(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    if (edits >= 1) {
+      return false;
+    }
+    edits += 1;
+
+    if (a.length > b.length) {
+      i += 1;
+      continue;
+    }
+    if (b.length > a.length) {
+      j += 1;
+      continue;
+    }
+    i += 1;
+    j += 1;
+  }
+
+  return (a.length - i) + (b.length - j) <= 1;
+}
+
+function asciiFold(value: string): string {
+  return normalize(value)
+    .normalize('NFKD')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function faqByBusiness(businessId: string): FaqVersion {
@@ -101,14 +148,25 @@ export function answerFromFaq(faq: FaqVersion, message: string): FaqEntry | unde
 
   return faq.entries.find((entry) => {
     const normalizedQuestion = normalize(entry.question);
+    const normalizedQuestionAscii = asciiFold(entry.question);
     const qTokens = tokenize(entry.question);
+    const qTokensAscii = tokenize(normalizedQuestionAscii);
+    const compactQuestion = compact(entry.question);
 
-    const directMatch = normalizedQuestion.includes(normalizedMessage) || normalizedMessage.includes(normalizedQuestion);
+    const directMatch =
+      normalizedQuestion.includes(normalizedMessage) ||
+      normalizedMessage.includes(normalizedQuestion) ||
+      normalizedQuestionAscii.includes(asciiFold(message)) ||
+      asciiFold(message).includes(normalizedQuestionAscii);
     if (directMatch) {
       return true;
     }
 
+    const messageTokensAscii = tokenize(asciiFold(message));
     const shared = qTokens.filter((token) => messageTokens.includes(token)).length;
-    return shared >= Math.max(2, Math.ceil(qTokens.length * 0.8));
+    const sharedAscii = qTokensAscii.filter((token) => messageTokensAscii.includes(token)).length;
+    const requiredOverlap = Math.max(1, Math.ceil(qTokens.length / 2));
+    const compactMessage = compact(message);
+    return shared >= requiredOverlap || sharedAscii >= requiredOverlap || compactMessage.includes(compactQuestion) || oneEditOrLessDistance(compactMessage, compactQuestion);
   });
 }
