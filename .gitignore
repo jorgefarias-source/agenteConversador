@@ -2,6 +2,7 @@
 
 dist
 .env
+.env.local
 .vscode
 .DS_Store
 state/*.json

@@ -14,6 +14,7 @@ export interface OutboundItem {
   status: 'pending' | 'dispatched' | 'canceled' | 'uncertain';
   createdAt: string;
   claimedUntil?: string;
+  claimToken?: string;
 }
 
 const outbox = new Map<string, OutboundItem>();
@@ -65,6 +66,7 @@ export function claimOutbound(limitSec = 10): OutboundItem | undefined {
   const updated = {
     ...entry,
     claimedUntil: new Date(now + limitSec * 1000).toISOString(),
+    claimToken: randomUUID(),
   };
 
   outbox.set(entry.deliveryId, updated);
@@ -72,10 +74,24 @@ export function claimOutbound(limitSec = 10): OutboundItem | undefined {
   return updated;
 }
 
-export function markDispatched(deliveryId: string, success: boolean, reason?: string): OutboundItem | undefined {
+export type MarkDispatchedResult =
+  | { ok: true; item: OutboundItem }
+  | { ok: false; reason: 'not_found' | 'claim_expired_or_invalid' };
+
+export function markDispatched(deliveryId: string, claimToken: string, success: boolean, reason?: string): MarkDispatchedResult {
   const row = outbox.get(deliveryId);
   if (!row) {
-    return undefined;
+    return { ok: false, reason: 'not_found' };
+  }
+
+  const stillOwned =
+    row.status === 'pending' &&
+    row.claimToken === claimToken &&
+    !!row.claimedUntil &&
+    new Date(row.claimedUntil).getTime() >= Date.now();
+
+  if (!stillOwned) {
+    return { ok: false, reason: 'claim_expired_or_invalid' };
   }
 
   const updated: OutboundItem = {
@@ -89,7 +105,7 @@ export function markDispatched(deliveryId: string, success: boolean, reason?: st
 
   outbox.set(deliveryId, updated);
   syncState();
-  return updated;
+  return { ok: true, item: updated };
 }
 
 export function pauseBySender(senderId: string): void {

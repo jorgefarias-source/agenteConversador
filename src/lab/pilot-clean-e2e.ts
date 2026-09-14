@@ -47,6 +47,7 @@ const pilot = spawn(
       APP_MODE: 'pilot',
       AGENT_CONNECTOR_TOKEN: 'token-teste-local',
       PILOT_SENDERS: 'remetente-demo-A',
+      CHANNEL_BUSINESS_MAP: 'canal-demo:ponto-do-recheio',
       PORT: String(PORT),
     },
   },

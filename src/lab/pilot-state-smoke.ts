@@ -54,12 +54,12 @@ const run = async () => {
   checks.push(check((state.state_file || '').endsWith('lab-state.json'), 'caminho do estado correto', { state_file: state.state_file }));
 
   const claim = await req('/v1/outbound/claim', { method: 'POST' });
-  const claimed = claim.body as { delivery_id?: string };
+  const claimed = claim.body as { delivery_id?: string; claim_token?: string };
   if (claimed.delivery_id) {
     await req(`/v1/outbound/${claimed.delivery_id}/result`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true }),
+      body: JSON.stringify({ ok: true, claim_token: claimed.claim_token }),
     });
   }
 

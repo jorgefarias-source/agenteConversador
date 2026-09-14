@@ -53,11 +53,11 @@ app.get('/v1/observacao', (_req, res) => {
   });
 });
 
-app.get('/v1/observacao/work', (_req, res) => {
+app.get('/v1/observacao/work', auth, (_req, res) => {
   res.json(allWork());
 });
 
-app.get('/v1/observacao/state', (_req, res) => {
+app.get('/v1/observacao/state', auth, (_req, res) => {
   res.json({
     state_file: stateFilePath(),
     inbound_total: inboundCount(),
@@ -67,7 +67,7 @@ app.get('/v1/observacao/state', (_req, res) => {
   });
 });
 
-app.post('/v1/observacao/state/reset', (_req, res) => {
+app.post('/v1/observacao/state/reset', auth, (_req, res) => {
   resetWork();
   resetOutbound();
   res.json({ ok: true, action: 'estado de inbound/outbox limpo', state_file: stateFilePath() });

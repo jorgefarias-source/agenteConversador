@@ -74,6 +74,7 @@ async function main() {
     result = await requestJson('POST', `/v1/outbound/${String(claimBody.delivery_id)}/result`, {
       ok: true,
       reason: 'e2e local',
+      claim_token: claimBody.claim_token,
     });
   }
 

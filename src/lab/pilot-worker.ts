@@ -2,6 +2,7 @@ import http from 'node:http';
 
 type ClaimResponse = {
   delivery_id?: string;
+  claim_token?: string;
   receipt_id?: string;
   response?: string;
   source?: string;
@@ -93,6 +94,7 @@ async function main() {
     const result = await requestJson('POST', `/v1/outbound/${claim.delivery_id}/result`, {
       ok: true,
       reason: 'enviado por worker local de laboratório',
+      claim_token: claim.claim_token,
     });
 
     processed += 1;

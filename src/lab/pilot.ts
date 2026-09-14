@@ -1,7 +1,7 @@
 ﻿import dotenv from 'dotenv';
 import express from 'express';
 
-import { parseEnv, requireConnectorToken, validatePaidConfig } from '../config/env';
+import { parseEnv, requireConnectorToken, resolveBusinessId, validatePaidConfig } from '../config/env';
 import { acceptIncoming, IncomingMessagePayload } from './inbox';
 import { answerFromFaq, faqByBusiness } from '../features/faq';
 import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCount, outboundPendingCount, pauseBySender, resetOutbound, stateFilePath } from './outbox';
@@ -110,17 +110,19 @@ app.get('/v1/painel', (_req, res) => {
           };
           const ping = async () => log(await request('/v1'));
           const state = async () => log(await request('/v1/observacao/state'));
+          let lastClaimToken = '';
           const claim = async () => {
-            const result = await request('/v1/outbound/claim', 'POST', {});
-            if (result.delivery_id) {
-              document.getElementById('deliveryId').value = result.delivery_id;
+            const claimResult = await request('/v1/outbound/claim', 'POST', {});
+            if (claimResult.delivery_id) {
+              document.getElementById('deliveryId').value = claimResult.delivery_id;
+              lastClaimToken = claimResult.claim_token || '';
             }
-            log(result);
+            log(claimResult);
           };
           const result = async () => {
             const id = document.getElementById('deliveryId').value;
             if (!id) { log({ error: 'Informe um delivery_id' }); return; }
-            log(await request('/v1/outbound/' + id + '/result', 'POST', { ok: true, reason: 'disparado pelo painel' }));
+            log(await request('/v1/outbound/' + id + '/result', 'POST', { ok: true, reason: 'disparado pelo painel', claim_token: lastClaimToken }));
           };
           const reset = async () => log(await request('/v1/observacao/state/reset', 'POST', {}));
         </script>
@@ -163,7 +165,20 @@ app.post('/v1/messages', auth, (req, res) => {
     });
   }
 
-  const faq = faqByBusiness('ponto-do-recheio');
+  const businessId = resolveBusinessId(cfg, payload.channel_account_id);
+  if (!businessId) {
+    return res.status(202).json({
+      receipt_id: work.receiptId,
+      message_id: work.messageId,
+      status: work.status,
+      duplicate: work.duplicate,
+      trace_id: work.traceId,
+      pilot: false,
+      note: 'Canal sem negócio cadastrado (CHANNEL_BUSINESS_MAP); mensagem registrada em observação.',
+    });
+  }
+
+  const faq = faqByBusiness(businessId);
   const faqMatch = answerFromFaq(faq, payload.text);
   const responseText = faqMatch
     ? `${faqMatch.answer}\n\n[Fonte: ${faq.version}]`
@@ -201,13 +216,13 @@ app.get('/v1/observacao', (_req, res) => {
   });
 });
 
-app.get('/v1/observacao/work', (_req, res) => {
+app.get('/v1/observacao/work', auth, (_req, res) => {
   res.json({
     outbox: allOutbound(),
   });
 });
 
-app.get('/v1/observacao/state', (_req, res) => {
+app.get('/v1/observacao/state', auth, (_req, res) => {
   res.json({
     state_file: stateFilePath(),
     inbound_total: inboundCount(),
@@ -217,7 +232,7 @@ app.get('/v1/observacao/state', (_req, res) => {
   });
 });
 
-app.post('/v1/observacao/state/reset', (_req, res) => {
+app.post('/v1/observacao/state/reset', auth, (_req, res) => {
   resetWork();
   resetOutbound();
   res.json({
@@ -227,13 +242,14 @@ app.post('/v1/observacao/state/reset', (_req, res) => {
   });
 });
 
-app.post('/v1/outbound/claim', (_req, res) => {
+app.post('/v1/outbound/claim', auth, (_req, res) => {
   const row = claimOutbound(15);
   if (!row) {
     return res.status(204).send();
   }
   return res.json({
     delivery_id: row.deliveryId,
+    claim_token: row.claimToken,
     receipt_id: row.receiptId,
     channel_account_id: row.channelAccountId,
     sender_id: row.senderId,
@@ -244,24 +260,26 @@ app.post('/v1/outbound/claim', (_req, res) => {
   });
 });
 
-app.post('/v1/outbound/:delivery_id/result', (req, res) => {
+app.post('/v1/outbound/:delivery_id/result', auth, (req, res) => {
   const deliveryId = String(req.params.delivery_id || '').trim();
   const payload = req.body || {};
+  const claimToken = String(payload.claim_token || '').trim();
   const success = payload.ok === true;
   const reason = payload.reason;
 
-  const updated = markDispatched(deliveryId, success, reason);
-  if (!updated) {
-    return res.status(404).json({ error: 'delivery_id nao encontrado.' });
+  const result = markDispatched(deliveryId, claimToken, success, reason);
+  if (!result.ok) {
+    const statusCode = result.reason === 'not_found' ? 404 : 409;
+    return res.status(statusCode).json({ error: result.reason });
   }
 
   return res.json({
-    delivery_id: updated.deliveryId,
-    status: updated.status,
+    delivery_id: result.item.deliveryId,
+    status: result.item.status,
   });
 });
 
-app.post('/v1/handoff', (req, res) => {
+app.post('/v1/handoff', auth, (req, res) => {
   const body = req.body || {};
   const senderId = String(body.sender_id || '').trim();
   if (!senderId) {

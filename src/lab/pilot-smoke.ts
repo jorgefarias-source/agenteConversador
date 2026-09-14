@@ -103,7 +103,10 @@ async function main() {
 
   let statusUpdated = false;
   if (claim.delivery_id) {
-    const result = await requestJson('POST', `/v1/outbound/${claim.delivery_id}/result`, { ok: true });
+    const result = await requestJson('POST', `/v1/outbound/${claim.delivery_id}/result`, {
+      ok: true,
+      claim_token: claim.claim_token,
+    });
     statusUpdated = result.status === 'dispatched';
   }
 

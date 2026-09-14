@@ -11,6 +11,7 @@ export interface AppConfig {
   port: number;
   connectorToken: string;
   allowPilotSenders: Set<string>;
+  channelBusinessMap: Map<string, string>;
 }
 
 function parseBool(value: string | undefined, fallback: boolean): boolean {
@@ -35,6 +36,20 @@ function parsePilotSenders(value: string | undefined): Set<string> {
   );
 }
 
+function parseChannelBusinessMap(value: string | undefined): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!value) {
+    return map;
+  }
+  for (const pair of value.split(',')) {
+    const [channel, business] = pair.split(':').map((raw) => raw.trim());
+    if (channel && business) {
+      map.set(channel, business);
+    }
+  }
+  return map;
+}
+
 export function parseEnv(raw: NodeJS.ProcessEnv): AppConfig {
   return {
     appMode: raw.APP_MODE === 'demo' ? 'demo' : raw.APP_MODE === 'pilot' ? 'pilot' : 'lab',
@@ -47,7 +62,12 @@ export function parseEnv(raw: NodeJS.ProcessEnv): AppConfig {
     port: parseInt(raw.PORT || '3000', 10) || 3000,
     connectorToken: (raw.AGENT_CONNECTOR_TOKEN || '').trim(),
     allowPilotSenders: parsePilotSenders(raw.PILOT_SENDERS),
+    channelBusinessMap: parseChannelBusinessMap(raw.CHANNEL_BUSINESS_MAP),
   };
+}
+
+export function resolveBusinessId(cfg: AppConfig, channelAccountId: string): string | undefined {
+  return cfg.channelBusinessMap.get(channelAccountId);
 }
 
 export function validatePaidConfig(cfg: AppConfig): { ok: boolean; reason?: string } {
