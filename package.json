@@ -7,6 +7,7 @@
     "lab": "tsx src/lab/server.ts",
     "observe": "tsx src/lab/observe.ts",
     "observe:e2e": "tsx src/lab/observe-e2e.ts",
+    "observe:clean-e2e": "tsx src/lab/observe-clean-e2e.ts",
     "pilot": "tsx src/lab/pilot.ts",
     "pilot:smoke": "tsx src/lab/pilot-smoke.ts",
     "pilot:state:smoke": "tsx src/lab/pilot-state-smoke.ts",
