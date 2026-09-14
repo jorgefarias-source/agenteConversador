@@ -240,11 +240,18 @@ app.get('/v1/observacao/work', auth, (_req, res) => {
 });
 
 app.get('/v1/observacao/state', auth, (_req, res) => {
+  const sourceDistribution = allOutbound().reduce<Record<string, number>>((acc, item) => {
+    const key = item.source;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   res.json({
     state_file: stateFilePath(),
     inbound_total: inboundCount(),
     outbound_total: outboundCount(),
     pending_outbound: outboundPendingCount(),
+    source_distribution: sourceDistribution,
     allow_send: false,
   });
 });
