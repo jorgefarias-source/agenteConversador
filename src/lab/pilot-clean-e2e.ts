@@ -32,17 +32,23 @@ for (const pid of pids) {
   }
 }
 
-const pilot = spawn(process.execPath, [require.resolve('../node_modules/tsx/dist/cli.mjs'), 'src/lab/pilot.ts'], {
-  stdio: 'ignore',
-  detached: true,
-  env: {
-    ...process.env,
-    APP_MODE: 'pilot',
-    AGENT_CONNECTOR_TOKEN: 'token-teste-local',
-    PILOT_SENDERS: 'remetente-demo-A',
-    PORT: String(PORT),
+const pilot = spawn(
+  process.platform === 'win32' ? 'npm.cmd' : 'npm',
+  ['run', 'pilot'],
+  {
+    cwd: process.cwd(),
+    stdio: 'ignore',
+    detached: true,
+    shell: true,
+    env: {
+      ...process.env,
+      APP_MODE: 'pilot',
+      AGENT_CONNECTOR_TOKEN: 'token-teste-local',
+      PILOT_SENDERS: 'remetente-demo-A',
+      PORT: String(PORT),
+    },
   },
-});
+);
 pilot.unref();
 
 await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -68,4 +74,3 @@ try {
   }
   await fs.writeFile('state/.pilot-clean-e2e.last.log', commandOutput || String(process.exitCode || 0), 'utf8');
 }
-
