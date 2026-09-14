@@ -6,6 +6,7 @@ import { parseEnv, validatePaidConfig } from '../config/env';
 import { answerFromFaq, faqByBusiness } from '../features/faq';
 
 dotenv.config();
+dotenv.config({ path: '.env.local', override: true });
 const cfg = parseEnv(process.env);
 
 const app = express();

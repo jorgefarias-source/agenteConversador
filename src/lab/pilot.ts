@@ -8,6 +8,7 @@ import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCo
 import { resetWork, inboundCount } from './inbox';
 
 dotenv.config();
+dotenv.config({ path: '.env.local', override: true });
 const cfg = parseEnv(process.env);
 
 const app = express();
