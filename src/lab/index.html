@@ -1,0 +1,96 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Laboratório - Agente WhatsApp</title>
+    <style>
+      :root { --bg: #0f172a; --card: #111827; --line: #243247; --text: #e5e7eb; --muted: #9ca3af; --ok: #22c55e; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: radial-gradient(circle at top, #1e293b, #0b1221); color: var(--text); min-height: 100vh; }
+      .wrap { max-width: 900px; margin: 24px auto; padding: 18px; display: grid; gap: 12px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      textarea, select, button, input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: var(--text); }
+      .messages { min-height: 180px; border: 1px dashed #334155; padding: 10px; border-radius: 8px; background: #0b1221; }
+      .bubble { margin: 8px 0; padding: 8px 10px; border-radius: 8px; }
+      .u { background: #1d4ed822; }
+      .a { background: #065f46; }
+      .meta { color: var(--muted); font-size: 12px; }
+      .tag { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: #1f2937; display: inline-block; }
+      .ok { color: var(--ok); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>LABORATÓRIO</h1>
+        <div class="tag">SIMULADOR — NÃO É IA</div>
+      </div>
+      <div class="card row">
+        <label>
+          Negócio
+          <select id="business">
+            <option value="ponto-do-recheio">Ponto do Recheio</option>
+            <option value="demo">Loja de Demonstração</option>
+          </select>
+        </label>
+        <label>
+          Mensagem
+          <textarea id="message" rows="2" placeholder="Digite uma pergunta"></textarea>
+        </label>
+      </div>
+      <div class="row">
+        <button id="send">Responder</button>
+        <button id="clear">Nova conversa</button>
+      </div>
+      <div class="card messages" id="log"></div>
+      <div class="card">
+        <div class="meta" id="meta">Estado: aguardando primeira mensagem.</div>
+      </div>
+    </div>
+
+    <script>
+      const $business = document.getElementById('business');
+      const $message = document.getElementById('message');
+      const $send = document.getElementById('send');
+      const $clear = document.getElementById('clear');
+      const $log = document.getElementById('log');
+      const $meta = document.getElementById('meta');
+
+      let messages = [];
+
+      function addBubble(label, text) {
+        const b = document.createElement('div');
+        b.className = 'bubble ' + (label === 'Usuário' ? 'u' : 'a');
+        b.textContent = `${label}: ${text}`;
+        $log.appendChild(b);
+      }
+
+      function renderMeta(data) {
+        $meta.innerHTML = `<span class="ok">latência:</span> ${data.latencyMs}ms | <span class="ok">fonte:</span> ${data.faqVersion} | <span class="ok">negócio:</span> ${data.businessName}`;
+      }
+
+      $send.addEventListener('click', async () => {
+        const text = $message.value.trim();
+        if (!text) return;
+        addBubble('Usuário', text);
+        const start = performance.now();
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ businessId: $business.value, text }),
+        });
+        const data = await res.json();
+        const elapsed = Math.round(performance.now() - start);
+        addBubble('Agente', data.response);
+        $meta.textContent = `latência: ${elapsed}ms | simulação: ${data.mode} | fonte: ${data.faqVersion}`;
+        $message.value = '';
+      });
+
+      $clear.addEventListener('click', () => {
+        $log.textContent = '';
+        $meta.textContent = 'Estado: conversa limpa.';
+      });
+    </script>
+  </body>
+</html>

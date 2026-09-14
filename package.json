@@ -1,0 +1,26 @@
+﻿{
+  "name": "agente-whatsapp-laboratorio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lab": "tsx src/lab/server.ts",
+    "observe": "tsx src/lab/observe.ts",
+    "pilot": "tsx src/lab/pilot.ts",
+    "pilot:smoke": "tsx src/lab/pilot-smoke.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "tsx --test src/lab/engine.test.ts",
+    "eval:local": "tsx src/lab/eval-local.ts",
+    "lab:scenarios": "tsx src/lab/eval-local.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
