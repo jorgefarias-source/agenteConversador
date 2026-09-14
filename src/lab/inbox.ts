@@ -1,4 +1,6 @@
-﻿import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+
+import { loadState, saveState } from './storage';
 
 export interface IncomingMessagePayload {
   schema_version: '1';
@@ -24,6 +26,19 @@ export interface PersistedWork {
 }
 
 const memoryStore = new Map<string, PersistedWork>();
+const initialState = loadState();
+
+for (const item of initialState.inbound) {
+  memoryStore.set(item.dedupeKey, item);
+}
+
+function syncState() {
+  const state = loadState();
+  saveState({
+    ...state,
+    inbound: Array.from(memoryStore.values()),
+  });
+}
 
 export function dedupeKey(payload: Pick<IncomingMessagePayload, 'channel_account_id' | 'message_id'>) {
   return `${payload.channel_account_id}|${payload.message_id}`;
@@ -52,6 +67,7 @@ export function acceptIncoming(payload: IncomingMessagePayload): PersistedWork {
   };
 
   memoryStore.set(key, work);
+  syncState();
   return work;
 }
 

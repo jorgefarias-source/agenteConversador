@@ -13,3 +13,5 @@
   - [modelos/04_CENARIOS_AVALIACAO_ETAPA3.md](modelos/04_CENARIOS_AVALIACAO_ETAPA3.md)
   - [modelos/04_RESULTADOS_DA_AVALIACAO.md](modelos/04_RESULTADOS_DA_AVALIACAO.md)
 
+
+- Etapa 4: PERSISTÊNCIA LOCAL INICIADA (estado em state/lab-state.json para inbound/outbox, sem banco ainda).

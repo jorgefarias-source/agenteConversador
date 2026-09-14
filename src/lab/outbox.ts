@@ -1,4 +1,6 @@
-﻿import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+
+import { loadState, saveState } from './storage';
 
 export interface OutboundItem {
   deliveryId: string;
@@ -15,6 +17,19 @@ export interface OutboundItem {
 }
 
 const outbox = new Map<string, OutboundItem>();
+const initialState = loadState();
+
+for (const item of initialState.outbound) {
+  outbox.set(item.deliveryId, item);
+}
+
+function syncState() {
+  const state = loadState();
+  saveState({
+    ...state,
+    outbound: Array.from(outbox.values()),
+  });
+}
 
 export function enqueueOutbound(item: Omit<OutboundItem, 'deliveryId' | 'status' | 'createdAt' | 'claimedUntil'>): OutboundItem {
   const deliveryId = `del-${randomUUID()}`;
@@ -25,6 +40,7 @@ export function enqueueOutbound(item: Omit<OutboundItem, 'deliveryId' | 'status'
     createdAt: new Date().toISOString(),
   };
   outbox.set(deliveryId, outbound);
+  syncState();
   return outbound;
 }
 
@@ -52,6 +68,7 @@ export function claimOutbound(limitSec = 10): OutboundItem | undefined {
   };
 
   outbox.set(entry.deliveryId, updated);
+  syncState();
   return updated;
 }
 
@@ -71,17 +88,23 @@ export function markDispatched(deliveryId: string, success: boolean, reason?: st
   }
 
   outbox.set(deliveryId, updated);
+  syncState();
   return updated;
 }
 
 export function pauseBySender(senderId: string): void {
+  let changed = false;
   for (const [deliveryId, row] of outbox.entries()) {
     if (row.senderId === senderId && row.status === 'pending') {
       outbox.set(deliveryId, { ...row, status: 'canceled' });
+      changed = true;
     }
+  }
+  if (changed) {
+    syncState();
   }
 }
 
 export function allOutbound() {
-  return [...outbox.values()];
+  return Array.from(outbox.values());
 }
