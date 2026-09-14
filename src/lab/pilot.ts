@@ -26,7 +26,8 @@ function hasMenuIntent(text: string): boolean {
 }
 
 function parseOrderReference(text: string): string | undefined {
-  const match = text.match(/pedido[^A-Za-z0-9]*([A-Za-z]{2,}-\d{2,}|[A-Za-z]{0,4}\d{4,}|#\d{3,})/i);
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const match = normalized.match(/\bpedido\b[^a-z0-9]*((?:[a-z]{1,4}[-#]?\d{3,}|\d{4,}))/i);
   return match ? match[1].replace('#', '').toUpperCase() : undefined;
 }
 

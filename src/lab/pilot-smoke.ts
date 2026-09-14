@@ -8,7 +8,17 @@ type MessageRecord = {
 };
 
 const token = process.env.AGENT_CONNECTOR_TOKEN || 'token-teste-local';
-const baseHost = 'http://127.0.0.1:3002';
+const args = process.argv.slice(2);
+const getArg = (key: string, fallback?: string) => {
+  const token = `--${key}=`;
+  const hit = args.find((value) => value.startsWith(token));
+  if (hit) {
+    return hit.substring(token.length);
+  }
+  return fallback;
+};
+
+const baseHost = getArg('baseHost', process.env.PILOT_SMOKE_BASE_HOST) || 'http://127.0.0.1:3000';
 
 function requestJson(method: 'POST' | 'GET', path: string, body?: unknown): Promise<any> {
   const fullUrl = `${baseHost}${path}`;
@@ -84,6 +94,12 @@ async function main() {
       channel_account_id: 'canal-demo',
       text: 'status do pedido PED-1001',
     },
+    {
+      message_id: 'audit-pilot-5',
+      sender_id: 'remetente-demo-A',
+      channel_account_id: 'canal-demo',
+      text: 'quero status do pedido PED-2001',
+    },
   ];
 
   const first = scenarios[0];
@@ -129,9 +145,21 @@ async function main() {
     type: 'text',
     text: fourth.text,
   });
+  const fifth = scenarios[4];
+  const p5 = await requestJson('POST', '/v1/messages', {
+    schema_version: '1',
+    message_id: fifth.message_id,
+    channel_account_id: fifth.channel_account_id,
+    sender_id: fifth.sender_id,
+    sent_at: '2026-09-14T12:00:04Z',
+    type: 'text',
+    text: fifth.text,
+  });
 
   const claim = await requestJson('POST', '/v1/outbound/claim', {});
   const claim2 = await requestJson('POST', '/v1/outbound/claim', {});
+  const claim3 = await requestJson('POST', '/v1/outbound/claim', {});
+  const claim4 = await requestJson('POST', '/v1/outbound/claim', {});
 
   let statusUpdated = false;
   if (claim.delivery_id) {
@@ -169,6 +197,21 @@ async function main() {
       name: 'd1_pedido_autorizado',
       pass: p4.delivery_id && String(p4.source_version || '').includes('d1-pedido-v1'),
       detail: { p4 },
+    },
+    {
+      name: 'd1_pedido_somente_do_titular_claim_correspondente',
+      pass: claim4.delivery_id === p5.delivery_id,
+      detail: { claim4_delivery_id: claim4.delivery_id, p5_delivery_id: p5.delivery_id },
+    },
+    {
+      name: 'd1_pedido_somente_do_titular',
+      pass: String(claim4.source_version || '').includes('d1-pedido-v1') && String(claim4.response || '').toLowerCase().includes('não foi possível localizar o pedido'),
+      detail: { p4, p5, claim4 },
+    },
+    {
+      name: 'd1_pedido_somente_do_titular_texto',
+      pass: String(claim4.response || '').toLowerCase().includes('não foi possível localizar o pedido'),
+      detail: { p4, p5, claim4 },
     },
   ];
 
