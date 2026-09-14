@@ -80,6 +80,17 @@ async function main() {
   const work = await requestJson('GET', '/v1/observacao/work');
 
   const hasDelivery = !!(claimBody && claimBody.delivery_id);
+  const claimBodyText = (claim.body as Record<string, unknown> | undefined)?.response;
+  const cardapioOk =
+    typeof claimBodyText === 'string' &&
+    claimBodyText.toLowerCase().includes('cardápio');
+
+  const ok =
+    (inbound.statusCode === 202 || inbound.statusCode === 200) &&
+    hasDelivery &&
+    (result.body as Record<string, unknown> | undefined)?.status === 'dispatched' &&
+    cardapioOk;
+
   console.log(
     JSON.stringify(
       {
@@ -87,6 +98,7 @@ async function main() {
         claim,
         result,
         hasDelivery,
+        cardapioOk,
         work,
       },
       null,
@@ -94,10 +106,9 @@ async function main() {
     ),
   );
 
-  if (!hasDelivery || !result.body || (result.body as Record<string, unknown>).status !== 'dispatched') {
+  if (!ok) {
     process.exitCode = 1;
   }
 }
 
 await main();
-
