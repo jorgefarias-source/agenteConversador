@@ -4,6 +4,7 @@ import express from 'express';
 import { parseEnv, requireConnectorToken, resolveBusinessId, validatePaidConfig } from '../config/env';
 import { acceptIncoming, IncomingMessagePayload } from './inbox';
 import { answerFromFaq, faqByBusiness } from '../features/faq';
+import { askPilotLlm } from '../features/llm';
 import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCount, outboundPendingCount, pauseBySender, resetOutbound, stateFilePath } from './outbox';
 import { resetWork, inboundCount } from './inbox';
 
@@ -132,7 +133,7 @@ app.get('/v1/painel', (_req, res) => {
   res.send(html);
 });
 
-app.post('/v1/messages', auth, (req, res) => {
+app.post('/v1/messages', auth, async (req, res) => {
   const payload = req.body as IncomingMessagePayload;
   if (!payload || payload.schema_version !== '1' || !payload.message_id || !payload.channel_account_id || !payload.sender_id || !payload.text) {
     return res.status(400).json({ error: 'Payload inválido para contrato de entrada.' });
@@ -180,9 +181,20 @@ app.post('/v1/messages', auth, (req, res) => {
 
   const faq = faqByBusiness(businessId);
   const faqMatch = answerFromFaq(faq, payload.text);
-  const responseText = faqMatch
+
+  const paid = validatePaidConfig(cfg);
+  let responseText = faqMatch
     ? `${faqMatch.answer}\n\n[Fonte: ${faq.version}]`
     : 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.';
+  let source: 'faq-matched' | 'fallback-human' | 'llm-paid' = faqMatch ? 'faq-matched' : 'fallback-human';
+
+  if (cfg.allowPaidLLM && paid.ok && !faqMatch) {
+    const llmReply = await askPilotLlm(cfg, faq, payload.text);
+    if (llmReply.ok) {
+      responseText = llmReply.response;
+      source = 'llm-paid';
+    }
+  }
 
   const outbound = enqueueOutbound({
     receiptId: work.receiptId,
@@ -190,7 +202,7 @@ app.post('/v1/messages', auth, (req, res) => {
     channelAccountId: payload.channel_account_id,
     senderId: payload.sender_id,
     responseText,
-    source: faqMatch ? 'faq-matched' : 'fallback-human',
+    source,
     sourceVersion: faq.version,
   });
 

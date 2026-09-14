@@ -9,7 +9,7 @@ export interface OutboundItem {
   channelAccountId: string;
   senderId: string;
   responseText: string;
-  source: 'faq-matched' | 'fallback-human';
+  source: 'faq-matched' | 'fallback-human' | 'llm-paid';
   sourceVersion: string;
   status: 'pending' | 'dispatched' | 'canceled' | 'uncertain';
   createdAt: string;
