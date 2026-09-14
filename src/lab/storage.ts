@@ -18,6 +18,20 @@ const defaultState: PersistedLabState = {
 
 const statePath = path.resolve(process.cwd(), process.env.AGENT_STATE_PATH || 'state/lab-state.json');
 
+export function getStatePath() {
+  return statePath;
+}
+
+export function clearState(): void {
+  const dir = path.dirname(statePath);
+  fs.mkdirSync(dir, { recursive: true });
+  saveState({
+    inbound: [],
+    outbound: [],
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export function loadState(): PersistedLabState {
   try {
     const raw = fs.readFileSync(statePath, 'utf8');

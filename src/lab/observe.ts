@@ -1,8 +1,9 @@
-﻿import express from 'express';
+import express from 'express';
 import dotenv from 'dotenv';
 
 import { parseEnv, requireConnectorToken, validatePaidConfig } from '../config/env';
-import { acceptIncoming, allWork, IncomingMessagePayload } from './inbox';
+import { acceptIncoming, allWork, IncomingMessagePayload, inboundCount, resetWork, stateFilePath } from './inbox';
+import { allOutbound, outboundCount, outboundPendingCount, resetOutbound } from './outbox';
 
 dotenv.config();
 const cfg = parseEnv(process.env);
@@ -54,6 +55,22 @@ app.get('/v1/observacao', (_req, res) => {
 
 app.get('/v1/observacao/work', (_req, res) => {
   res.json(allWork());
+});
+
+app.get('/v1/observacao/state', (_req, res) => {
+  res.json({
+    state_file: stateFilePath(),
+    inbound_total: inboundCount(),
+    outbound_total: outboundCount(),
+    pending_outbound: outboundPendingCount(),
+    allow_send: false,
+  });
+});
+
+app.post('/v1/observacao/state/reset', (_req, res) => {
+  resetWork();
+  resetOutbound();
+  res.json({ ok: true, action: 'estado de inbound/outbox limpo', state_file: stateFilePath() });
 });
 
 const port = cfg.port;

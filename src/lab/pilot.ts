@@ -4,7 +4,8 @@ import express from 'express';
 import { parseEnv, requireConnectorToken, validatePaidConfig } from '../config/env';
 import { acceptIncoming, IncomingMessagePayload } from './inbox';
 import { answerFromFaq, faqByBusiness } from '../features/faq';
-import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, pauseBySender } from './outbox';
+import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCount, outboundPendingCount, pauseBySender, resetOutbound, stateFilePath } from './outbox';
+import { resetWork, inboundCount } from './inbox';
 
 dotenv.config();
 const cfg = parseEnv(process.env);
@@ -92,13 +93,33 @@ app.get('/v1/observacao', (_req, res) => {
     allow_send: false,
     allow_paid_llm: validatePaidConfig(cfg).ok,
     allowed_sender_count: cfg.allowPilotSenders.size,
-    pending_outbound: allOutbound().filter((row) => row.status === 'pending').length,
+    pending_outbound: outboundPendingCount(),
   });
 });
 
 app.get('/v1/observacao/work', (_req, res) => {
   res.json({
     outbox: allOutbound(),
+  });
+});
+
+app.get('/v1/observacao/state', (_req, res) => {
+  res.json({
+    state_file: stateFilePath(),
+    inbound_total: inboundCount(),
+    outbound_total: outboundCount(),
+    pending_outbound: outboundPendingCount(),
+    allow_send: false,
+  });
+});
+
+app.post('/v1/observacao/state/reset', (_req, res) => {
+  resetWork();
+  resetOutbound();
+  res.json({
+    ok: true,
+    action: 'estado de inbound/outbox limpo',
+    state_file: stateFilePath(),
   });
 });
 

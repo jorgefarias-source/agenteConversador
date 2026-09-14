@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { loadState, saveState } from './storage';
+import { clearState, getStatePath, loadState, saveState } from './storage';
 
 export interface IncomingMessagePayload {
   schema_version: '1';
@@ -73,4 +73,17 @@ export function acceptIncoming(payload: IncomingMessagePayload): PersistedWork {
 
 export function allWork() {
   return Array.from(memoryStore.values());
+}
+
+export function resetWork() {
+  memoryStore.clear();
+  clearState();
+}
+
+export function inboundCount() {
+  return memoryStore.size;
+}
+
+export function stateFilePath() {
+  return getStatePath();
 }

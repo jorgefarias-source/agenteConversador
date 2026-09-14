@@ -17,3 +17,5 @@ Observação final:
 - 2026-09-14T15:15:00Z: Ajuste para incluir FAQ-004 (cardápio) em src/features/faq.ts, para responder pedido de cardápio no modo laboratório.
 
 - 2026-09-14T15:25:00Z: Iniciada persistência de Etapa 4 em memória local para produção simulada (`state/lab-state.json` via `AGENT_STATE_PATH`, sem commit do arquivo): inbound/outbox agora sobrevivem a reinício em modo lab/piloto/observação. `
+
+- 2026-09-14T15:35:00Z: Adicionados endpoints de estado persistido: /v1/observacao/state e /v1/observacao/state/reset em modos observação e piloto, com contadores de inbound/outbound e caminho do state file.

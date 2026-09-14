@@ -15,3 +15,5 @@
 
 
 - Etapa 4: PERSISTÊNCIA LOCAL INICIADA (estado em state/lab-state.json para inbound/outbox, sem banco ainda).
+
+- Etapa 4: adicionada observabilidade de estado persistido para restart/diagnóstico local.

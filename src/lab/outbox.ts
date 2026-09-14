@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { loadState, saveState } from './storage';
+import { clearState, getStatePath, loadState, saveState } from './storage';
 
 export interface OutboundItem {
   deliveryId: string;
@@ -107,4 +107,21 @@ export function pauseBySender(senderId: string): void {
 
 export function allOutbound() {
   return Array.from(outbox.values());
+}
+
+export function resetOutbound() {
+  outbox.clear();
+  clearState();
+}
+
+export function outboundCount() {
+  return outbox.size;
+}
+
+export function outboundPendingCount() {
+  return Array.from(outbox.values()).filter((item) => item.status === 'pending').length;
+}
+
+export function stateFilePath() {
+  return getStatePath();
 }
