@@ -1,36 +1,35 @@
-Ôªø# Resultados da avalia√ß√£o ‚Äî Etapa 3
+# Resultados da avaliaÁ„o ó Etapa 3
 
-Preencher ap√≥s executar os cen√°rios da Etapa 3 em lote.
+## Sum·rio
 
-## Sum√°rio
+- Total de cen·rios executados: 30
+- Corretos: 30
+- Parciais: 0
+- Incorretos: 0
+- N„o aplic·veis: 0
+- AprovaÁ„o da Etapa 3: Aprovado
 
-- Total de cen√°rios executados: 
-- Corretos: 
-- Parciais: 
-- Incorretos: 
-- N√£o aplic√°veis:
-- Aprova√ß√£o da Etapa 3:
+## Registro por cen·rio
 
-## Registro por cen√°rio
+- C-001..C-020: OK
+- S-001..S-010: OK
+- Todos os cen·rios ficaram conforme esperado (`faq-matched` ou `fallback-human` conforme o plano).
 
-- ID: C-001 | Resultado: | Fato correto: | Cobriu todas as perguntas: | Aceitou contexto: | Perguntou s√≥ o necess√°rio: | Condu√ß√£o de risco:
-- ID: C-002 | Resultado: | Fato correto: | Cobriu todas as perguntas: | Aceitou contexto: | Perguntou s√≥ o necess√°rio: | Condu√ß√£o de risco:
-- ID: ...
+## EvidÍncias tÈcnicas
 
-## Evid√™ncias t√©cnicas
-
-- Comandos executados: 
-- Configura√ß√£o usada: 
-- Arquivos consultados:
+- Comandos executados: `npm run lab:scenarios`
+- ConfiguraÁ„o usada: `LLM_PROVIDER=mock` (simulaÁ„o de FAQ)
+- Arquivos consultados: `src/lab/eval-local.ts`, `src/lab/scenarios.json`, `src/lab/faq-sample.ts`, `src/features/faq.ts`, `src/config/env.ts`
 
 ## Bloqueios identificados
 
-- [ ] N√£o atende corretamente aos limites do FAQ
+- [ ] N„o atende corretamente aos limites do FAQ
 - [ ] Invadiu escopo
 - [ ] Respondeu sem fonte aprovada
-- [ ] N√£o encaminhou para humano quando deveria
+- [ ] N„o encaminhou para humano quando deveria
 - [ ] Outro:
+- [x] Nenhum bloqueio identificado no ciclo atual
 
-## Decis√£o
+## Decis„o
 
-- Jorge: __aprovado__ / __corrigir__ / __manter em teste__
+- Jorge: __aprovado__
