@@ -44,6 +44,69 @@ app.get('/v1', (_req, res) => {
   res.json({ ok: true, mode: 'pilot-lab', message: 'Servidor de laboratório ativo', version: 'v0.3' });
 });
 
+app.get('/v1/painel', (_req, res) => {
+  const html = `<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>Painel de teste - piloto</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 24px; background: #f4f6fb; color: #18202d; }
+          button { margin-right: 8px; padding: 8px 12px; }
+          pre { background: #fff; border: 1px solid #d7deea; padding: 12px; border-radius: 8px; }
+          .row { margin-bottom: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>Painel de teste (modo piloto)</h1>
+        <div class="row">
+          <button onclick="ping()">GET /v1</button>
+          <button onclick="state()">GET estado</button>
+          <button onclick="claim()">Claim outbound</button>
+          <button onclick="result()">Result (OK) no último claim</button>
+          <button onclick="reset()">Reset estado</button>
+        </div>
+        <div class="row">
+          <label>Último delivery_id: </label>
+          <input id="deliveryId" size="48" />
+        </div>
+        <pre id="log">carregando...</pre>
+        <script>
+          const token = 'token-teste-local';
+          const base = '';
+          const log = (value) => document.getElementById('log').textContent = JSON.stringify(value, null, 2);
+          const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+          const request = async (path, method='GET', body) => {
+            const r = await fetch(base + path, {
+              method,
+              headers,
+              body: body ? JSON.stringify(body) : undefined
+            });
+            const text = await r.text();
+            try { return JSON.parse(text || '{}'); } catch { return { statusCode: r.status, text }; }
+          };
+          const ping = async () => log(await request('/v1'));
+          const state = async () => log(await request('/v1/observacao/state'));
+          const claim = async () => {
+            const result = await request('/v1/outbound/claim', 'POST', {});
+            if (result.delivery_id) {
+              document.getElementById('deliveryId').value = result.delivery_id;
+            }
+            log(result);
+          };
+          const result = async () => {
+            const id = document.getElementById('deliveryId').value;
+            if (!id) { log({ error: 'Informe um delivery_id' }); return; }
+            log(await request(`/v1/outbound/${id}/result`, 'POST', { ok: true, reason: 'disparado pelo painel' }));
+          };
+          const reset = async () => log(await request('/v1/observacao/state/reset', 'POST', {}));
+        </script>
+      </body>
+    </html>`;
+  res.setHeader('content-type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 app.post('/v1/messages', auth, (req, res) => {
   const payload = req.body as IncomingMessagePayload;
   if (!payload || payload.schema_version !== '1' || !payload.message_id || !payload.channel_account_id || !payload.sender_id || !payload.text) {
