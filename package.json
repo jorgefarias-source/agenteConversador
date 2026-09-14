@@ -9,6 +9,7 @@
     "pilot": "tsx src/lab/pilot.ts",
     "pilot:smoke": "tsx src/lab/pilot-smoke.ts",
     "pilot:state:smoke": "tsx src/lab/pilot-state-smoke.ts",
+    "pilot:worker": "tsx src/lab/pilot-worker.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/lab/engine.test.ts",
