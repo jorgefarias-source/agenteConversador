@@ -116,7 +116,16 @@ async function main() {
     { name: 'coorte_autorizada_gera_outbound', pass: !!p1.delivery_id, detail: p1 },
     { name: 'coorte_nao_autorizada_nao_dispara', pass: p2.pilot === false, detail: p2 },
     { name: 'deduplicacao', pass: duplicate.duplicate === true && duplicate.receipt_id === p1.receipt_id, detail: { p1, duplicate } },
-    { name: 'claim_e_resultado', pass: !!claim.delivery_id && claim2.status === undefined && statusUpdated, detail: { claim, claim2, statusUpdated } },
+    {
+      name: 'claim_e_resultado',
+      pass: !!claim.delivery_id && claim2.status === undefined && statusUpdated,
+      detail: { claim, claim2, statusUpdated },
+    },
+    {
+      name: 'origem_do_outbound',
+      pass: Boolean(claim.source === 'faq-matched' || claim.source === 'fallback-human' || claim.source === 'llm-paid'),
+      detail: { source: claim.source },
+    },
   ];
 
   const passed = checks.every((item) => item.pass);

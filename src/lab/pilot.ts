@@ -219,10 +219,15 @@ app.post('/v1/messages', auth, async (req, res) => {
 });
 
 app.get('/v1/observacao', (_req, res) => {
+  const paid = validatePaidConfig(cfg);
   res.json({
     mode: 'piloto-limited',
     allow_send: false,
-    allow_paid_llm: validatePaidConfig(cfg).ok,
+    allow_paid_llm: cfg.allowPaidLLM,
+    paid_enabled_effective: paid.ok,
+    paid_config_error: paid.reason ?? null,
+    llm_provider: cfg.llmProvider || null,
+    llm_model: cfg.llmModel || null,
     allowed_sender_count: cfg.allowPilotSenders.size,
     pending_outbound: outboundPendingCount(),
   });
