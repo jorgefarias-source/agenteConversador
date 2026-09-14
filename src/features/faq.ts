@@ -62,6 +62,14 @@ export function faqByBusiness(businessId: string): FaqVersion {
         approvedBy: 'Pré-projeto',
         status: 'aprovado',
       },
+      {
+        id: 'FAQ-004',
+        theme: 'cardapio',
+        question: 'Cardápio',
+        answer: 'No momento o cardápio completo não está disponível no laboratório; confirme com a equipe comercial para atualização real.',
+        approvedBy: 'Pré-projeto',
+        status: 'aprovado',
+      },
     ],
   };
 
