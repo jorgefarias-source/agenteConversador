@@ -8,7 +8,7 @@ import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCo
 import { resetWork, inboundCount } from './inbox';
 
 dotenv.config();
-dotenv.config({ path: '.env.local', override: true });
+dotenv.config({ path: '.env.local', override: false });
 const cfg = parseEnv(process.env);
 
 const app = express();
@@ -85,7 +85,7 @@ app.get('/v1/painel', (_req, res) => {
           const token = 'token-teste-local';
           const base = '';
           const log = (value) => document.getElementById('log').textContent = JSON.stringify(value, null, 2);
-          const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+          const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
           const request = async (path, method='GET', body) => {
             const r = await fetch(base + path, {
               method,
@@ -120,7 +120,7 @@ app.get('/v1/painel', (_req, res) => {
           const result = async () => {
             const id = document.getElementById('deliveryId').value;
             if (!id) { log({ error: 'Informe um delivery_id' }); return; }
-            log(await request(`/v1/outbound/${id}/result`, 'POST', { ok: true, reason: 'disparado pelo painel' }));
+            log(await request('/v1/outbound/' + id + '/result', 'POST', { ok: true, reason: 'disparado pelo painel' }));
           };
           const reset = async () => log(await request('/v1/observacao/state/reset', 'POST', {}));
         </script>
