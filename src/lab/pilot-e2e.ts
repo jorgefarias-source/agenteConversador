@@ -8,6 +8,7 @@ type HttpResult = {
 const token = process.env.AGENT_CONNECTOR_TOKEN || 'token-teste-local';
 const baseUrl = process.env.PILOT_BASE_URL || 'http://127.0.0.1:3002';
 const senderId = process.env.PILOT_E2E_SENDER || 'remetente-demo-A';
+const nonCohortSender = `${senderId}-nao-autorizado`;
 
 function requestJson(method: 'GET' | 'POST', path: string, body?: unknown): Promise<HttpResult> {
   const payload = method === 'POST' ? JSON.stringify(body ?? {}) : '';
@@ -54,7 +55,10 @@ function requestJson(method: 'GET' | 'POST', path: string, body?: unknown): Prom
 }
 
 async function main() {
+  const stateBefore = await requestJson('GET', '/v1/observacao/state');
+
   const messageId = `e2e-${Date.now()}`;
+  const nonCohortMessageId = `e2e-nc-${Date.now()}`;
 
   const inbound = await requestJson('POST', '/v1/messages', {
     schema_version: '1',
@@ -63,8 +67,22 @@ async function main() {
     sender_id: senderId,
     sent_at: new Date().toISOString(),
     type: 'text',
-    text: 'cardápio',
+    text: 'cardapio',
   });
+
+  const stateAfterAllowed = await requestJson('GET', '/v1/observacao/state');
+
+  const nonCohortInbound = await requestJson('POST', '/v1/messages', {
+    schema_version: '1',
+    message_id: nonCohortMessageId,
+    channel_account_id: 'canal-demo',
+    sender_id: nonCohortSender,
+    sent_at: new Date().toISOString(),
+    type: 'text',
+    text: 'cardapio',
+  });
+
+  const stateAfterNonCohort = await requestJson('GET', '/v1/observacao/state');
 
   const claim = await requestJson('POST', '/v1/outbound/claim');
   const claimBody = claim.body as Record<string, unknown>;
@@ -82,23 +100,49 @@ async function main() {
 
   const hasDelivery = !!(claimBody && claimBody.delivery_id);
   const claimBodyText = (claim.body as Record<string, unknown> | undefined)?.response;
-  const cardapioOk =
-    typeof claimBodyText === 'string' &&
-    claimBodyText.toLowerCase().includes('cardápio');
+  const claimText = typeof claimBodyText === 'string' ? String(claimBodyText).toLowerCase() : '';
+  const cardapioOk = claimText.includes('cardapio') || claimText.includes('card�pio');
 
-  const ok =
+  const inboundBody = inbound.body as Record<string, unknown> | undefined;
+  const nonCohortBody = nonCohortInbound.body as Record<string, unknown> | undefined;
+  const stateBeforeBody = stateBefore.body as Record<string, unknown> | undefined;
+  const stateAfterAllowedBody = stateAfterAllowed.body as Record<string, unknown> | undefined;
+  const stateAfterNonCohortBody = stateAfterNonCohort.body as Record<string, unknown> | undefined;
+
+  const outboundBefore = Number(stateBeforeBody?.outbound_total ?? 0);
+  const outboundAfterAllowed = Number(stateAfterAllowedBody?.outbound_total ?? 0);
+  const outboundAfterNonCohort = Number(stateAfterNonCohortBody?.outbound_total ?? 0);
+
+  const allowedFlowOk =
     (inbound.statusCode === 202 || inbound.statusCode === 200) &&
-    hasDelivery &&
-    (result.body as Record<string, unknown> | undefined)?.status === 'dispatched' &&
-    cardapioOk;
+    inboundBody?.pilot === true &&
+    inboundBody?.delivery_id !== undefined &&
+    cardapioOk &&
+    outboundAfterAllowed === outboundBefore + 1;
+
+  const nonCohortFlowOk =
+    (nonCohortInbound.statusCode === 202 || nonCohortInbound.statusCode === 200) &&
+    nonCohortBody?.pilot === false &&
+    nonCohortBody?.delivery_id === undefined &&
+    outboundAfterNonCohort === outboundAfterAllowed;
+
+  const resultOk = (result.body as Record<string, unknown> | undefined)?.status === 'dispatched';
+
+  const ok = hasDelivery && allowedFlowOk && nonCohortFlowOk && resultOk;
 
   console.log(
     JSON.stringify(
       {
         inbound,
+        stateBefore,
+        stateAfterAllowed,
+        nonCohortInbound,
+        stateAfterNonCohort,
         claim,
         result,
         hasDelivery,
+        allowedFlowOk,
+        nonCohortFlowOk,
         cardapioOk,
         work,
       },
