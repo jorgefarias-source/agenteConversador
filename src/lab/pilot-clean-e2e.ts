@@ -33,13 +33,15 @@ for (const pid of pids) {
 }
 
 const pilot = spawn(
-  process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['run', 'pilot'],
+  process.platform === 'win32' ? 'cmd.exe' : 'npm',
+  process.platform === 'win32'
+    ? ['/c', 'npm.cmd', 'run', 'pilot']
+    : ['run', 'pilot'],
   {
     cwd: process.cwd(),
     stdio: 'ignore',
     detached: true,
-    shell: true,
+    shell: false,
     env: {
       ...process.env,
       APP_MODE: 'pilot',
