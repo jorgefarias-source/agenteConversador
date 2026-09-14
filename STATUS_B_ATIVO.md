@@ -9,3 +9,5 @@ Atualização do projeto:
 
 Observação final:
 - Este é ponto inicial, ainda sem integração real com conector e sem escrita no banco.
+
+- 2026-09-14T15:00:25Z: Etapa C smoke (`npm run pilot:smoke`) passou em 127.0.0.1:3002 com AGENT_CONNECTOR_TOKEN=token_teste_local e PILOT_SENDERS=remetente-demo-A.
