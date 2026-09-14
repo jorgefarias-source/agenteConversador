@@ -5,6 +5,7 @@ import { parseEnv, requireConnectorToken, resolveBusinessId, validatePaidConfig 
 import { acceptIncoming, IncomingMessagePayload } from './inbox';
 import { answerFromFaq, faqByBusiness } from '../features/faq';
 import { askPilotLlm } from '../features/llm';
+import { getMenuForBusiness, resolveOrderForCustomer } from './customer-data';
 import { allOutbound, claimOutbound, enqueueOutbound, markDispatched, outboundCount, outboundPendingCount, pauseBySender, resetOutbound, stateFilePath } from './outbox';
 import { resetWork, inboundCount } from './inbox';
 
@@ -14,6 +15,38 @@ const cfg = parseEnv(process.env);
 
 const app = express();
 app.use(express.json());
+
+function normalizeForIntent(value: string): string {
+  return value.normalize('NFD').replace(/[^\w\s]/gu, ' ').toLowerCase().trim();
+}
+
+function hasMenuIntent(text: string): boolean {
+  const normalized = normalizeForIntent(text);
+  return /\bcardapio\b|\bcardapios\b|\bmenu\b/.test(normalized);
+}
+
+function parseOrderReference(text: string): string | undefined {
+  const match = text.match(/pedido[^A-Za-z0-9]*([A-Za-z]{2,}-\d{2,}|[A-Za-z]{0,4}\d{4,}|#\d{3,})/i);
+  return match ? match[1].replace('#', '').toUpperCase() : undefined;
+}
+
+function formatMenu(businessId: string): string {
+  const menu = getMenuForBusiness(businessId);
+  return menu.map((item) => `- ${item.section}: ${item.name} (${item.priceText})`).join('\n');
+}
+
+function formatOrderForSender(orderRef: string, order?: { status: string; totalText: string; createdAt: string }): string {
+  if (!order) {
+    return `Não foi possível localizar o pedido ${orderRef}. Sem acesso suficiente para validar, seguimos com atendimento humano.`;
+  }
+
+  return [
+    `Pedido: ${orderRef}`,
+    `Status atual: ${order.status}`,
+    `Criado em: ${order.createdAt}`,
+    `Total: ${order.totalText}`,
+  ].join('\n');
+}
 
 function auth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const expected = requireConnectorToken(cfg);
@@ -182,17 +215,31 @@ app.post('/v1/messages', auth, async (req, res) => {
   const faq = faqByBusiness(businessId);
   const faqMatch = answerFromFaq(faq, payload.text);
 
-  const paid = validatePaidConfig(cfg);
   let responseText = faqMatch
     ? `${faqMatch.answer}\n\n[Fonte: ${faq.version}]`
     : 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.';
-  let source: 'faq-matched' | 'fallback-human' | 'llm-paid' = faqMatch ? 'faq-matched' : 'fallback-human';
+  let source: 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult' = faqMatch
+    ? 'faq-matched'
+    : 'fallback-human';
 
-  if (cfg.allowPaidLLM && paid.ok && !faqMatch) {
-    const llmReply = await askPilotLlm(cfg, faq, payload.text);
-    if (llmReply.ok) {
-      responseText = llmReply.response;
-      source = 'llm-paid';
+  const text = payload.text;
+  const orderRef = parseOrderReference(text);
+
+  if (hasMenuIntent(text)) {
+    responseText = `Cardápio atual:\n${formatMenu(businessId)}`;
+    source = 'cardapio-consult';
+  } else if (orderRef) {
+    const order = resolveOrderForCustomer(businessId, payload.sender_id, payload.channel_account_id, orderRef);
+    responseText = formatOrderForSender(orderRef, order);
+    source = 'pedido-consult';
+  } else if (cfg.allowPaidLLM && !faqMatch) {
+    const paid = validatePaidConfig(cfg);
+    if (paid.ok) {
+      const llmReply = await askPilotLlm(cfg, faq, text);
+      if (llmReply.ok) {
+        responseText = llmReply.response;
+        source = 'llm-paid';
+      }
     }
   }
 
@@ -203,7 +250,7 @@ app.post('/v1/messages', auth, async (req, res) => {
     senderId: payload.sender_id,
     responseText,
     source,
-    sourceVersion: faq.version,
+    sourceVersion: source === 'cardapio-consult' ? 'd1-menu-v1' : source === 'pedido-consult' ? 'd1-pedido-v1' : faq.version,
   });
 
   return res.status(202).json({

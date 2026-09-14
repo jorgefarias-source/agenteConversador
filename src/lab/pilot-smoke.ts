@@ -72,6 +72,18 @@ async function main() {
       channel_account_id: 'canal-demo',
       text: 'Vocês fazem entrega?',
     },
+    {
+      message_id: 'audit-pilot-3',
+      sender_id: 'remetente-demo-A',
+      channel_account_id: 'canal-demo',
+      text: 'Me manda o cardápio',
+    },
+    {
+      message_id: 'audit-pilot-4',
+      sender_id: 'remetente-demo-A',
+      channel_account_id: 'canal-demo',
+      text: 'status do pedido PED-1001',
+    },
   ];
 
   const first = scenarios[0];
@@ -96,6 +108,26 @@ async function main() {
     sent_at: '2026-09-14T12:00:01Z',
     type: 'text',
     text: second.text,
+  });
+  const third = scenarios[2];
+  const p3 = await requestJson('POST', '/v1/messages', {
+    schema_version: '1',
+    message_id: third.message_id,
+    channel_account_id: third.channel_account_id,
+    sender_id: third.sender_id,
+    sent_at: '2026-09-14T12:00:02Z',
+    type: 'text',
+    text: third.text,
+  });
+  const fourth = scenarios[3];
+  const p4 = await requestJson('POST', '/v1/messages', {
+    schema_version: '1',
+    message_id: fourth.message_id,
+    channel_account_id: fourth.channel_account_id,
+    sender_id: fourth.sender_id,
+    sent_at: '2026-09-14T12:00:03Z',
+    type: 'text',
+    text: fourth.text,
   });
 
   const claim = await requestJson('POST', '/v1/outbound/claim', {});
@@ -123,8 +155,20 @@ async function main() {
     },
     {
       name: 'origem_do_outbound',
-      pass: Boolean(claim.source === 'faq-matched' || claim.source === 'fallback-human' || claim.source === 'llm-paid'),
+      pass: Boolean(
+        claim.source === 'faq-matched' ||
+          claim.source === 'fallback-human' ||
+          claim.source === 'llm-paid' ||
+          claim.source === 'cardapio-consult' ||
+          claim.source === 'pedido-consult',
+      ),
       detail: { source: claim.source },
+    },
+    { name: 'd1_cardapio', pass: p3.delivery_id && String(p3.source_version || '').includes('d1-menu-v1'), detail: { p3 } },
+    {
+      name: 'd1_pedido_autorizado',
+      pass: p4.delivery_id && String(p4.source_version || '').includes('d1-pedido-v1'),
+      detail: { p4 },
     },
   ];
 

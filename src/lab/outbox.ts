@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto';
-
+﻿import { randomUUID } from 'node:crypto';
 import { clearState, getStatePath, loadState, saveState } from './storage';
 
 export interface OutboundItem {
@@ -9,7 +8,7 @@ export interface OutboundItem {
   channelAccountId: string;
   senderId: string;
   responseText: string;
-  source: 'faq-matched' | 'fallback-human' | 'llm-paid';
+  source: 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult';
   sourceVersion: string;
   status: 'pending' | 'dispatched' | 'canceled' | 'uncertain';
   createdAt: string;

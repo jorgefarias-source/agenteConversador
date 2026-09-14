@@ -1,4 +1,4 @@
-import http from 'node:http';
+ï»¿import http from 'node:http';
 
 type HttpResult = {
   statusCode: number;
@@ -59,6 +59,7 @@ async function main() {
 
   const messageId = `e2e-${Date.now()}`;
   const nonCohortMessageId = `e2e-nc-${Date.now()}`;
+  const orderMessageId = `e2e-order-${Date.now()}`;
 
   const inbound = await requestJson('POST', '/v1/messages', {
     schema_version: '1',
@@ -82,6 +83,16 @@ async function main() {
     text: 'cardapio',
   });
 
+  const orderInbound = await requestJson('POST', '/v1/messages', {
+    schema_version: '1',
+    message_id: orderMessageId,
+    channel_account_id: 'canal-demo',
+    sender_id: senderId,
+    sent_at: new Date().toISOString(),
+    type: 'text',
+    text: 'status do pedido PED-1001',
+  });
+
   const stateAfterNonCohort = await requestJson('GET', '/v1/observacao/state');
 
   const claim = await requestJson('POST', '/v1/outbound/claim');
@@ -101,10 +112,11 @@ async function main() {
   const hasDelivery = !!(claimBody && claimBody.delivery_id);
   const claimBodyText = (claim.body as Record<string, unknown> | undefined)?.response;
   const claimText = typeof claimBodyText === 'string' ? String(claimBodyText).toLowerCase() : '';
-  const cardapioOk = claimText.includes('cardapio') || claimText.includes('cardápio');
+  const cardapioOk = claimText.includes('cardapio') || claimText.includes('cardapio');
 
   const inboundBody = inbound.body as Record<string, unknown> | undefined;
   const nonCohortBody = nonCohortInbound.body as Record<string, unknown> | undefined;
+  const orderBody = orderInbound.body as Record<string, unknown> | undefined;
   const stateBeforeBody = stateBefore.body as Record<string, unknown> | undefined;
   const stateAfterAllowedBody = stateAfterAllowed.body as Record<string, unknown> | undefined;
   const stateAfterNonCohortBody = stateAfterNonCohort.body as Record<string, unknown> | undefined;
@@ -113,12 +125,22 @@ async function main() {
   const outboundAfterAllowed = Number(stateAfterAllowedBody?.outbound_total ?? 0);
   const outboundAfterNonCohort = Number(stateAfterNonCohortBody?.outbound_total ?? 0);
 
+  const outbox = ((work.body as Record<string, unknown> | undefined)?.outbox as Array<Record<string, unknown>> | undefined) || [];
+  const hasPedidoOutbound = outbox.some((item) => item.source_version === 'd1-pedido-v1');
+
   const allowedFlowOk =
     (inbound.statusCode === 202 || inbound.statusCode === 200) &&
     inboundBody?.pilot === true &&
     inboundBody?.delivery_id !== undefined &&
     cardapioOk &&
-    outboundAfterAllowed === outboundBefore + 1;
+    outboundAfterAllowed === outboundBefore + 2;
+
+  const orderFlowOk =
+    (orderInbound.statusCode === 202 || orderInbound.statusCode === 200) &&
+    orderBody?.pilot === true &&
+    orderBody?.delivery_id !== undefined &&
+    orderBody?.source_version === 'd1-pedido-v1' &&
+    hasPedidoOutbound;
 
   const nonCohortFlowOk =
     (nonCohortInbound.statusCode === 202 || nonCohortInbound.statusCode === 200) &&
@@ -128,7 +150,7 @@ async function main() {
 
   const resultOk = (result.body as Record<string, unknown> | undefined)?.status === 'dispatched';
 
-  const ok = hasDelivery && allowedFlowOk && nonCohortFlowOk && resultOk;
+  const ok = hasDelivery && allowedFlowOk && orderFlowOk && nonCohortFlowOk && resultOk;
 
   console.log(
     JSON.stringify(
@@ -137,11 +159,13 @@ async function main() {
         stateBefore,
         stateAfterAllowed,
         nonCohortInbound,
+        orderInbound,
         stateAfterNonCohort,
         claim,
         result,
         hasDelivery,
         allowedFlowOk,
+        orderFlowOk,
         nonCohortFlowOk,
         cardapioOk,
         work,
