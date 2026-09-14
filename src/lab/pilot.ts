@@ -26,6 +26,24 @@ function auth(req: express.Request, res: express.Response, next: express.NextFun
   return next();
 }
 
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'agente-whatsapp-laboratorio',
+    mode: 'pilot-worker',
+    endpoints: {
+      health: '/v1',
+      observe: '/v1/observacao',
+      claim: '/v1/outbound/claim',
+      result: '/v1/outbound/:delivery_id/result',
+      messages: '/v1/messages',
+    },
+  });
+});
+
+app.get('/v1', (_req, res) => {
+  res.json({ ok: true, mode: 'pilot-lab', message: 'Servidor de laboratório ativo', version: 'v0.3' });
+});
+
 app.post('/v1/messages', auth, (req, res) => {
   const payload = req.body as IncomingMessagePayload;
   if (!payload || payload.schema_version !== '1' || !payload.message_id || !payload.channel_account_id || !payload.sender_id || !payload.text) {
