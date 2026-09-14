@@ -1,11 +1,11 @@
 # Status de progresso atual
 
-- Etapa 0: OK (decis„o inicial e limites)
+- Etapa 0: OK (decis√£o inicial e limites)
   - [modelos/01_DECISOES_DO_PILOTO.md](modelos/01_DECISOES_DO_PILOTO.md)
-- Etapa 1: INÕCIO (FAQ e regras em template)
+- Etapa 1: IN√çCIO (FAQ e regras em template)
   - [modelos/02_FAQ_PARA_PREENCHER.md](modelos/02_FAQ_PARA_PREENCHER.md)
   - [modelos/03_REGRAS_DE_CONVERSA.md](modelos/03_REGRAS_DE_CONVERSA.md)
-- Etapa 2: LABORAT”RIO (estrutura pronta)
+- Etapa 2: LABORAT√ìRIO (estrutura pronta)
   - [package.json](package.json)
   - [src/lab/server.ts](src/lab/server.ts)
   - [prompts/01_LABORATORIO.md](prompts/01_LABORATORIO.md)
@@ -13,22 +13,22 @@
   - [modelos/04_CENARIOS_AVALIACAO_ETAPA3.md](modelos/04_CENARIOS_AVALIACAO_ETAPA3.md)
   - [modelos/04_RESULTADOS_DA_AVALIACAO.md](modelos/04_RESULTADOS_DA_AVALIACAO.md)
 
-- Etapa 4: PERSIST NCIA LOCAL INICIADA (estado em state/lab-state.json para inbound/outbox, sem banco ainda).
+- Etapa 4: PERSIST√äNCIA LOCAL INICIADA (estado em state/lab-state.json para inbound/outbox, sem banco ainda).
 
-- Etapa 4: adicionada observabilidade de estado persistido para restart/diagnÛstico local.
+- Etapa 4: adicionada observabilidade de estado persistido para restart/diagn√≥stico local.
 
-- Etapa 4: validaÁ„o de persistÍncia local concluÌda (smoke de estado + reset).
+- Etapa 4: valida√ß√£o de persist√™ncia local conclu√≠da (smoke de estado + reset).
 
-- Etapa C ó Piloto ao vivo concluÌda:
+- Etapa C ‚Äî Piloto ao vivo conclu√≠da:
   - Endpoint de piloto com controle de coorte: [src/lab/pilot.ts](src/lab/pilot.ts)
   - Outbox com claim e prova de propriedade: [src/lab/outbox.ts](src/lab/outbox.ts)
   - Testes e scripts: [src/lab/pilot.ts](src/lab/pilot.ts), [src/lab/pilot-e2e.ts](src/lab/pilot-e2e.ts), [src/lab/pilot-smoke.ts](src/lab/pilot-smoke.ts), [src/lab/pilot-clean-e2e.ts](src/lab/pilot-clean-e2e.ts), [src/lab/pilot-state-smoke.ts](src/lab/pilot-state-smoke.ts)
   - Caminho LLM pago opcional: [src/features/llm.ts](src/features/llm.ts)
-  - Observabilidade de configuraÁ„o/execuÁ„o em `/v1/observacao` e `/v1/observacao/state`.
+  - Observabilidade de configura√ß√£o/execu√ß√£o em `/v1/observacao` e `/v1/observacao/state`.
 
-- Etapa D1 ó consulta de cliente iniciada (base de dados local de validaÁ„o):
-  - Consulta de card·pio atual: [src/lab/customer-data.ts](src/lab/customer-data.ts), [src/lab/pilot.ts](src/lab/pilot.ts)
+- Etapa D1 ‚Äî consulta de cliente iniciada (base de dados local de valida√ß√£o):
+  - Consulta de card√°pio atual: [src/lab/customer-data.ts](src/lab/customer-data.ts), [src/lab/pilot.ts](src/lab/pilot.ts)
   - Fonte do outbound em D1 marcada por `d1-menu-v1` e `d1-pedido-v1`.
-  - Smoke/e2e atualizados para cen·rios D1: [src/lab/pilot-smoke.ts](src/lab/pilot-smoke.ts), [src/lab/pilot-e2e.ts](src/lab/pilot-e2e.ts)
+  - Smoke/e2e atualizados para cen√°rios D1: [src/lab/pilot-smoke.ts](src/lab/pilot-smoke.ts), [src/lab/pilot-e2e.ts](src/lab/pilot-e2e.ts)
 
-- PrÛxima fase sugerida: consolidar D1 com integraÁ„o real de fonte e validaÁ„o de acesso antes de D2.
+- Pr√≥xima fase sugerida: consolidar D1 com integra√ß√£o real de fonte e valida√ß√£o de acesso antes de D2.

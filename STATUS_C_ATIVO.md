@@ -1,23 +1,23 @@
-# Fase C ativa: piloto com coorte e saída observável
+# Fase C ativa: piloto com coorte e saÃ­da observÃ¡vel
 
-Concluída com sucesso: 2026-09-14.
+ConcluÃ­da com sucesso: 2026-09-14.
 
-Arquivo de referência:
+Arquivo de referÃªncia:
 - [docs/guias/ETAPA_C_PILOTO.md](docs/guias/ETAPA_C_PILOTO.md)
 - [docs/guias/ETAPA_C_SMOKE.md](docs/guias/ETAPA_C_SMOKE.md)
 
 Entregas implementadas:
-- `POST /v1/messages` com autorização e trilha de coorte.
+- `POST /v1/messages` com autorizaÃ§Ã£o e trilha de coorte.
 - Mensagem fora da coorte: `pilot: false` sem `delivery_id`.
-- Mensagem autorizada: `delivery_id`, registro em outbox e deduplicação por `message_id`.
+- Mensagem autorizada: `delivery_id`, registro em outbox e deduplicaÃ§Ã£o por `message_id`.
 - Outbound protegido por claim token em `claim` e `result`.
 - Observabilidade de estado persistido em `/v1/observacao/state`.
 - Smoke e E2E de piloto cobrindo:
-  - geração de outbound para coorte;
-  - recusa para remetente não autorizado;
-  - deduplicação;
-  - claim e atualização de estado para `dispatched`;
-  - validação de distribuição de fonte (`faq-matched`, `fallback-human`, `llm-paid`).
+  - geraÃ§Ã£o de outbound para coorte;
+  - recusa para remetente nÃ£o autorizado;
+  - deduplicaÃ§Ã£o;
+  - claim e atualizaÃ§Ã£o de estado para `dispatched`;
+  - validaÃ§Ã£o de distribuiÃ§Ã£o de fonte (`faq-matched`, `fallback-human`, `llm-paid`).
 - Caminho opcional de LLM pago com fallback seguro em `src/features/llm.ts`.
 
 Comandos usados na fase:
@@ -27,5 +27,5 @@ Comandos usados na fase:
 - `npm.cmd run pilot:e2e`
 - `npm.cmd run pilot:clean-e2e`
 
-Pendência para a próxima fase:
-- implementar etapa D1 com dados de cliente autorizados, consulta de cardápio/pedido e validações de propriedade.
+PendÃªncia para a prÃ³xima fase:
+- implementar etapa D1 com dados de cliente autorizados, consulta de cardÃ¡pio/pedido e validaÃ§Ãµes de propriedade.

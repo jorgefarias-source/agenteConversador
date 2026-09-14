@@ -1,4 +1,5 @@
 ﻿import { validatePaidConfig, AppConfig } from '../config/env';
+import { commitBudget, estimateCallCostUsd, releaseBudget, reserveBudget } from './llm-budget';
 import type { FaqVersion } from './faq';
 
 export interface PaidReplyResult {
@@ -54,25 +55,54 @@ export async function askPilotLlm(
     };
   }
 
+  const estimatedCostUsd = estimateCallCostUsd(model);
+  const reservation = reserveBudget(cfg.llmBudgetUsd, estimatedCostUsd);
+  if (!reservation) {
+    return {
+      ok: false,
+      source: 'llm-fallback',
+      response: 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.',
+      reason: 'budget_exhausted',
+    };
+  }
+
   const prompt = buildPrompt(faq, text);
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: 'Você é um assistente de atendimento e segue regras estritas de segurança.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 350,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  let response: Response;
+  try {
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'Você é um assistente de atendimento e segue regras estritas de segurança.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 350,
+      }),
+    });
+  } catch (error) {
+    releaseBudget(reservation);
+    return {
+      ok: false,
+      source: 'llm-fallback',
+      response: 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.',
+      reason: controller.signal.aborted ? 'llm-timeout' : 'llm-network-error',
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
+    releaseBudget(reservation);
     return {
       ok: false,
       source: 'llm-fallback',
@@ -85,6 +115,7 @@ export async function askPilotLlm(
     const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const content = payload.choices?.[0]?.message?.content;
     if (!content || !content.trim()) {
+      releaseBudget(reservation);
       return {
         ok: false,
         source: 'llm-fallback',
@@ -93,12 +124,14 @@ export async function askPilotLlm(
       };
     }
 
+    commitBudget(reservation, estimatedCostUsd);
     return {
       ok: true,
       source: 'llm-paid',
       response: safeSnippet(content),
     };
   } catch {
+    releaseBudget(reservation);
     return {
       ok: false,
       source: 'llm-fallback',

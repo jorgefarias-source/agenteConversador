@@ -65,8 +65,8 @@ const DEMO_BUSINESS: BusinessData = {
 };
 
 const FALLBACK_BUSINESS = {
-  businessId: 'demonstração',
-  businessName: 'Loja de Demonstração',
+  businessId: 'demonstraÃ§Ã£o',
+  businessName: 'Loja de DemonstraÃ§Ã£o',
   menu: [
     { id: 'm1', name: 'Mini lanche', section: 'Lanches', priceText: 'R$ 18,00' },
     { id: 'm2', name: 'Refrigerante 350ml', section: 'Bebidas', priceText: 'R$ 7,00' },
