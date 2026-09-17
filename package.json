@@ -20,7 +20,6 @@
     "pilot:smoke:demo": "tsx src/lab/pilot-smoke-demo.ts",
     "seed:demo": "tsx src/lab/seed-demo-tenant.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/lab/engine.test.ts",
     "test:db": "tsx --test src/lab/db.integration.test.ts",
     "eval:local": "tsx src/lab/eval-local.ts",
