@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'node:path';
 
 import { parseEnv, validatePaidConfig } from '../config/env';
-import { answerFromFaq, faqByBusiness } from '../features/faq';
+import { answerFromFaq, faqDemoFixture } from '../features/faq';
 
 dotenv.config();
 dotenv.config({ path: '.env.local', override: false });
@@ -33,7 +33,7 @@ app.post('/api/chat', (req, res) => {
   const text = typeof req.body?.text === 'string' ? req.body.text : '';
 
   const paid = validatePaidConfig(cfg);
-  const source = faqByBusiness(businessId);
+  const source = faqDemoFixture(businessId);
   const matched = answerFromFaq(source, text);
 
   const responseText = matched?.answer || 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.';

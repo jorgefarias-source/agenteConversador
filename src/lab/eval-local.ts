@@ -1,7 +1,7 @@
 ﻿import fs from 'node:fs';
 
 import { parseEnv, validatePaidConfig } from '../config/env';
-import { answerFromFaq, faqByBusiness } from '../features/faq';
+import { answerFromFaq, faqDemoFixture } from '../features/faq';
 
 const cfg = parseEnv(process.env);
 const paid = validatePaidConfig(cfg);
@@ -11,7 +11,7 @@ const parsed = JSON.parse(raw) as {
 };
 
 function simulate(input: string) {
-  const business = faqByBusiness('ponto-do-recheio');
+  const business = faqDemoFixture('ponto-do-recheio');
   const match = answerFromFaq(business, input);
   return match ? 'faq-matched' : 'fallback-human';
 }

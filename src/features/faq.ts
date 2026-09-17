@@ -78,10 +78,15 @@ function asciiFold(value: string): string {
     .trim();
 }
 
-export function faqByBusiness(businessId: string): FaqVersion {
+// Fixture usada apenas por ferramentas locais desconectadas do banco (modo "lab" sem
+// Postgres e o script de avaliação offline eval-local.ts). O fluxo real de atendimento
+// (pilot.ts/message-processor.ts) usa faqForTenant (src/infra/faq-repo.ts), configurável
+// por tenant via API — este fixture não é usado lá.
+export function faqDemoFixture(businessId: string): FaqVersion {
   const now = new Date().toISOString();
-
-  const demoBase: Omit<FaqVersion, 'businessId' | 'businessName'> = {
+  return {
+    businessId,
+    businessName: businessId === 'ponto-do-recheio' ? 'Ponto do Recheio' : 'Loja de Demonstração',
     version: 'faq-v0-demo',
     updatedAt: now,
     entries: [
@@ -119,23 +124,6 @@ export function faqByBusiness(businessId: string): FaqVersion {
       },
     ],
   };
-
-  const fallback: FaqVersion = {
-    ...demoBase,
-    businessId: 'demonstração',
-    businessName: 'Loja de Demonstração',
-  };
-
-  if (businessId === 'ponto-do-recheio') {
-    return {
-      ...fallback,
-      businessId: 'ponto-do-recheio',
-      businessName: 'Ponto do Recheio',
-      version: 'faq-v1',
-    };
-  }
-
-  return fallback;
 }
 
 export function answerFromFaq(faq: FaqVersion, message: string): FaqEntry | undefined {

@@ -1,7 +1,8 @@
 import type { AppConfig } from '../config/env';
 import { validatePaidConfig } from '../config/env';
 import { acceptIncoming, IncomingMessagePayload } from './inbox';
-import { answerFromFaq, faqByBusiness } from '../features/faq';
+import { answerFromFaq } from '../features/faq';
+import { faqForTenant } from '../infra/faq-repo';
 import { askPilotLlm } from '../features/llm';
 import { getMenuForTenant, resolveOrderForCustomer } from './customer-data';
 import { enqueueOutbound, OutboundItem } from './outbox';
@@ -79,13 +80,11 @@ export async function processIncomingMessage(cfg: AppConfig, payload: IncomingMe
     return { kind: 'duplicate', ...base };
   }
 
-  const businessId = tenant.slug;
-
   if (await isEscalated(payload.channel_account_id, payload.sender_id)) {
     return { kind: 'escalated', ...base };
   }
 
-  const faq = faqByBusiness(businessId);
+  const faq = await faqForTenant(tenant.id, tenant.slug, tenant.name);
   const faqMatch = answerFromFaq(faq, payload.text);
 
   let responseText = faqMatch

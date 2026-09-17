@@ -16,6 +16,7 @@ import {
 } from '../infra/tenants';
 import { runMigrations } from '../infra/db';
 import { listTenantsWithStats } from '../infra/admin-stats';
+import { createFaqEntry, deleteFaqEntry, listFaqEntries, updateFaqEntry } from '../infra/faq-repo';
 import { processIncomingMessage } from './message-processor';
 import {
   getConnectionQr,
@@ -472,6 +473,66 @@ app.delete('/v1/tenants/:channel_account_id/pilot-senders/:sender_id', auth, asy
     return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
   }
   const removed = await removePilotSender(tenant.id, req.params.sender_id);
+  return res.json({ ok: true, removed });
+});
+
+// FAQ por tenant: é assim que se configura o que o bot responde para cada cliente,
+// sem programar. Só entradas com status "aprovado" entram no matching de respostas.
+
+app.get('/v1/tenants/:channel_account_id/faq', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  return res.json({ entries: await listFaqEntries(tenant.id) });
+});
+
+app.post('/v1/tenants/:channel_account_id/faq', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const body = req.body || {};
+  const question = String(body.question || '').trim();
+  const answer = String(body.answer || '').trim();
+  if (!question || !answer) {
+    return res.status(400).json({ error: 'question e answer são obrigatórios.' });
+  }
+  const entry = await createFaqEntry(tenant.id, {
+    question,
+    answer,
+    theme: body.theme,
+    approvedBy: body.approved_by,
+    status: body.status === 'rascunho' ? 'rascunho' : 'aprovado',
+  });
+  return res.status(201).json({ entry });
+});
+
+app.patch('/v1/tenants/:channel_account_id/faq/:faq_id', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const body = req.body || {};
+  const entry = await updateFaqEntry(tenant.id, req.params.faq_id, {
+    theme: body.theme,
+    question: body.question,
+    answer: body.answer,
+    approvedBy: body.approved_by,
+    status: body.status === 'rascunho' || body.status === 'aprovado' ? body.status : undefined,
+  });
+  if (!entry) {
+    return res.status(404).json({ error: 'Entrada de FAQ não encontrada para esse tenant.' });
+  }
+  return res.json({ entry });
+});
+
+app.delete('/v1/tenants/:channel_account_id/faq/:faq_id', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const removed = await deleteFaqEntry(tenant.id, req.params.faq_id);
   return res.json({ ok: true, removed });
 });
 
