@@ -39,7 +39,11 @@ function auth(req: express.Request, res: express.Response, next: express.NextFun
     return res.status(401).json({ error: 'AGENT_CONNECTOR_TOKEN ausente no ambiente.' });
   }
 
-  if ((req.headers.authorization || '') !== `Bearer ${expected}`) {
+  // Aceita o token via header (uso normal de API) ou via query string ?token=...
+  // (conveniência para abrir o painel direto no navegador, colando a URL).
+  const headerOk = (req.headers.authorization || '') === `Bearer ${expected}`;
+  const queryOk = typeof req.query.token === 'string' && req.query.token === expected;
+  if (!headerOk && !queryOk) {
     return res.status(401).json({ error: 'Autorização inválida.' });
   }
 
@@ -220,9 +224,9 @@ app.get('/v1/admin/painel', auth, (_req, res) => {
           <tbody></tbody>
         </table>
         <script>
-          const token = 'token-teste-local';
+          const token = new URLSearchParams(location.search).get('token') || '';
           async function load() {
-            const r = await fetch('/v1/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+            const r = await fetch('/v1/admin/overview?token=' + encodeURIComponent(token));
             const data = await r.json();
             document.getElementById('summary').textContent =
               data.tenants_total + ' negócio(s) no total — ' + data.tenants_with_issue + ' com possível problema.';
