@@ -91,7 +91,55 @@ uma resposta sem ativá-la ainda.
 padrão já faz isso certo). Só ferramentas de linha de comando digitando acento manualmente em
 alguns terminais Windows podem corromper caracteres — não é um problema da API.
 
-## 3) Consultas específicas de cardápio/pedido (Fase D, ainda fixture)
+## 3) Recursos configuráveis (link, lista ou texto) — cardápio online, especialidades, etc.
+
+Isso é o mecanismo genérico para qualquer coisa específica do tipo de negócio: um link (ex:
+cardápio online de um restaurante/petshop), uma lista (ex: especialidades de uma clínica no
+Cuida) ou um texto fixo. Configurável por tenant, acionado por palavras-gatilho:
+
+```http
+GET    /v1/tenants/petshop-123/resources
+POST   /v1/tenants/petshop-123/resources
+PATCH  /v1/tenants/petshop-123/resources/:resource_id
+DELETE /v1/tenants/petshop-123/resources/:resource_id
+```
+
+Exemplo — cardápio como link (em vez do bot mandar o menu em texto):
+
+```json
+POST /v1/tenants/petshop-123/resources
+{
+  "key": "cardapio-online",
+  "label": "Cardápio online",
+  "kind": "link",
+  "value_text": "https://minhaloja.com/cardapio",
+  "trigger_keywords": ["cardapio", "menu"]
+}
+```
+
+Exemplo — especialidades disponíveis (caso do Cuida, quando o paciente pede agendamento):
+
+```json
+POST /v1/tenants/clinica-456/resources
+{
+  "key": "especialidades",
+  "label": "Especialidades disponíveis",
+  "kind": "list",
+  "value_list": ["Clínico geral", "Pediatria", "Dermatologia", "Cardiologia"],
+  "trigger_keywords": ["especialidade", "especialidades", "agendamento", "agendar"]
+}
+```
+
+Quando a mensagem do cliente contém qualquer uma das `trigger_keywords` (como palavra inteira,
+ignorando acento/maiúsculas), o bot responde formatando automaticamente conforme o `kind`:
+- `link`: `"{label}: {value_text}"`
+- `list`: `"{label}:\n- item1\n- item2..."`
+- `text`: `{value_text}` puro
+
+Um recurso configurado tem prioridade sobre o cardápio/pedido de demonstração da Fase D (ver
+seção 4) — é o caminho recomendado para qualquer negócio real.
+
+## 4) Consultas específicas de cardápio/pedido (Fase D, ainda fixture — considere usar recursos)
 
 Hoje `cardápio` e `status do pedido PED-xxxx` são reconhecidos automaticamente pelo bot, mas os
 dados (menu, clientes, pedidos) ainda são de demonstração, específicos do tenant
@@ -99,7 +147,7 @@ dados (menu, clientes, pedidos) ainda são de demonstração, específicos do te
 ainda. Se seu sistema precisar disso, é um próximo passo a construir (schema já existe:
 `menu_items`, `customers`, `orders`, todos com `tenant_id`).
 
-## 4) Fila de atendimento humano (escalonamento)
+## 5) Fila de atendimento humano (escalonamento)
 
 Quando o bot não sabe responder, a conversa é automaticamente movida para uma fila — o cliente
 final (ex: o petshop) deve ver essa fila **dentro do próprio sistema dele**, consultando:
@@ -119,7 +167,7 @@ POST /v1/handoff/resolve
 { "channel_account_id": "petshop-123", "sender_id": "5511999999999@s.whatsapp.net" }
 ```
 
-## 5) Modo piloto (opcional)
+## 6) Modo piloto (opcional)
 
 Por padrão, um tenant novo responde **qualquer remetente automaticamente** — é o comportamento
 certo para operação real. Se quiser testar com poucos clientes reais antes de abrir geral:

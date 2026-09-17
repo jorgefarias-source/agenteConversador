@@ -9,7 +9,7 @@ export interface OutboundItem {
   channelAccountId: string;
   senderId: string;
   responseText: string;
-  source: 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult';
+  source: 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult' | 'tenant-resource';
   sourceVersion: string;
   status: 'pending' | 'dispatched' | 'canceled' | 'uncertain';
   createdAt: string;

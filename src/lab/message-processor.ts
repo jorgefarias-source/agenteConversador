@@ -8,6 +8,7 @@ import { getMenuForTenant, resolveOrderForCustomer } from './customer-data';
 import { enqueueOutbound, OutboundItem } from './outbox';
 import { escalateSender, isEscalated } from './handoff';
 import { isPilotSenderAllowed, resolveTenantByChannel } from '../infra/tenants';
+import { findMatchingResource, formatResource } from '../infra/resources-repo';
 
 function normalizeForIntent(value: string): string {
   return value
@@ -29,8 +30,7 @@ function parseOrderReference(text: string): string | undefined {
   return match ? match[1].replace('#', '').toUpperCase() : undefined;
 }
 
-async function formatMenu(tenantId: string): Promise<string> {
-  const menu = await getMenuForTenant(tenantId);
+function formatMenu(menu: Awaited<ReturnType<typeof getMenuForTenant>>): string {
   return menu.map((item) => `- ${item.section}: ${item.name} (${item.priceText})`).join('\n');
 }
 
@@ -53,6 +53,8 @@ export type ProcessResult =
   | { kind: 'duplicate'; receiptId: string; messageId: string; status: string; duplicate: boolean; traceId: string }
   | { kind: 'escalated'; receiptId: string; messageId: string; status: string; duplicate: boolean; traceId: string }
   | { kind: 'answered'; receiptId: string; messageId: string; status: string; duplicate: boolean; traceId: string; outbound: OutboundItem };
+
+type Source = 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult' | 'tenant-resource';
 
 export async function processIncomingMessage(cfg: AppConfig, payload: IncomingMessagePayload): Promise<ProcessResult> {
   const tenant = await resolveTenantByChannel(payload.channel_account_id);
@@ -90,20 +92,25 @@ export async function processIncomingMessage(cfg: AppConfig, payload: IncomingMe
   let responseText = faqMatch
     ? `${faqMatch.answer}\n\n[Fonte: ${faq.version}]`
     : 'Não consigo responder com segurança. Posso encaminhar para atendimento humano.';
-  let source: 'faq-matched' | 'fallback-human' | 'llm-paid' | 'cardapio-consult' | 'pedido-consult' = faqMatch
-    ? 'faq-matched'
-    : 'fallback-human';
+  let source: Source = faqMatch ? 'faq-matched' : 'fallback-human';
 
   const text = payload.text;
   const orderRef = parseOrderReference(text);
+  const matchedResource = await findMatchingResource(tenant.id, text);
 
-  if (hasMenuIntent(text)) {
-    responseText = `Cardápio atual:\n${await formatMenu(tenant.id)}`;
-    source = 'cardapio-consult';
+  if (matchedResource) {
+    responseText = formatResource(matchedResource);
+    source = 'tenant-resource';
   } else if (orderRef) {
     const order = await resolveOrderForCustomer(tenant.id, payload.channel_account_id, payload.sender_id, orderRef);
     responseText = formatOrderForSender(orderRef, order);
     source = 'pedido-consult';
+  } else if (hasMenuIntent(text)) {
+    const menu = await getMenuForTenant(tenant.id);
+    if (menu.length > 0) {
+      responseText = `Cardápio atual:\n${formatMenu(menu)}`;
+      source = 'cardapio-consult';
+    }
   } else if (cfg.allowPaidLLM && !faqMatch) {
     const paid = validatePaidConfig(cfg);
     if (paid.ok) {
@@ -126,7 +133,14 @@ export async function processIncomingMessage(cfg: AppConfig, payload: IncomingMe
     senderId: payload.sender_id,
     responseText,
     source,
-    sourceVersion: source === 'cardapio-consult' ? 'd1-menu-v1' : source === 'pedido-consult' ? 'd1-pedido-v1' : faq.version,
+    sourceVersion:
+      source === 'cardapio-consult'
+        ? 'd1-menu-v1'
+        : source === 'pedido-consult'
+          ? 'd1-pedido-v1'
+          : source === 'tenant-resource'
+            ? `resource-${matchedResource?.key}`
+            : faq.version,
   });
 
   return { kind: 'answered', ...base, outbound };

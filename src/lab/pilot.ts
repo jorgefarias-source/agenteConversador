@@ -17,6 +17,7 @@ import {
 import { runMigrations } from '../infra/db';
 import { listTenantsWithStats } from '../infra/admin-stats';
 import { createFaqEntry, deleteFaqEntry, listFaqEntries, updateFaqEntry } from '../infra/faq-repo';
+import { createResource, deleteResource, listResources, updateResource } from '../infra/resources-repo';
 import { processIncomingMessage } from './message-processor';
 import {
   getConnectionQr,
@@ -533,6 +534,80 @@ app.delete('/v1/tenants/:channel_account_id/faq/:faq_id', auth, async (req, res)
     return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
   }
   const removed = await deleteFaqEntry(tenant.id, req.params.faq_id);
+  return res.json({ ok: true, removed });
+});
+
+// Recursos genéricos por tenant: link/lista/texto acionado por palavra-gatilho. É o que
+// permite, por exemplo, um cardápio online (link) para um PetShop ou uma lista de
+// especialidades disponíveis para o Cuida, sem precisar de código novo por tipo de negócio.
+
+app.get('/v1/tenants/:channel_account_id/resources', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  return res.json({ resources: await listResources(tenant.id) });
+});
+
+app.post('/v1/tenants/:channel_account_id/resources', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const body = req.body || {};
+  const key = String(body.key || '').trim();
+  const label = String(body.label || '').trim();
+  const kind = body.kind;
+  const triggerKeywords = Array.isArray(body.trigger_keywords) ? body.trigger_keywords.map(String) : [];
+
+  if (!key || !label || !['link', 'list', 'text'].includes(kind) || triggerKeywords.length === 0) {
+    return res.status(400).json({
+      error: 'key, label, kind (link|list|text) e trigger_keywords (lista não vazia) são obrigatórios.',
+    });
+  }
+  if ((kind === 'link' || kind === 'text') && !body.value_text) {
+    return res.status(400).json({ error: 'value_text é obrigatório para kind=link ou kind=text.' });
+  }
+  if (kind === 'list' && (!Array.isArray(body.value_list) || body.value_list.length === 0)) {
+    return res.status(400).json({ error: 'value_list (lista não vazia) é obrigatório para kind=list.' });
+  }
+
+  const resource = await createResource(tenant.id, {
+    key,
+    label,
+    kind,
+    valueText: body.value_text,
+    valueList: Array.isArray(body.value_list) ? body.value_list.map(String) : undefined,
+    triggerKeywords,
+  });
+  return res.status(201).json({ resource });
+});
+
+app.patch('/v1/tenants/:channel_account_id/resources/:resource_id', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const body = req.body || {};
+  const resource = await updateResource(tenant.id, req.params.resource_id, {
+    label: body.label,
+    kind: body.kind,
+    valueText: body.value_text,
+    valueList: Array.isArray(body.value_list) ? body.value_list.map(String) : undefined,
+    triggerKeywords: Array.isArray(body.trigger_keywords) ? body.trigger_keywords.map(String) : undefined,
+  });
+  if (!resource) {
+    return res.status(404).json({ error: 'Recurso não encontrado para esse tenant.' });
+  }
+  return res.json({ resource });
+});
+
+app.delete('/v1/tenants/:channel_account_id/resources/:resource_id', auth, async (req, res) => {
+  const tenant = await resolveTenantByChannel(req.params.channel_account_id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Canal sem tenant cadastrado.' });
+  }
+  const removed = await deleteResource(tenant.id, req.params.resource_id);
   return res.json({ ok: true, removed });
 });
 
