@@ -1,9 +1,10 @@
-﻿{
+{
   "name": "agente-whatsapp-laboratorio",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "tsx src/lab/pilot.ts",
     "lab": "tsx src/lab/server.ts",
     "observe": "tsx src/lab/observe.ts",
     "observe:e2e": "tsx src/lab/observe-e2e.ts",
@@ -17,18 +18,27 @@
     "pilot:smoke:3001": "tsx src/lab/pilot-smoke.ts --baseHost=http://127.0.0.1:3001",
     "pilot:smoke:auto": "node -e \"(async()=>{const {spawnSync} = await import('node:child_process'); const baseHost = process.env.PILOT_SMOKE_BASE_HOST || `http://127.0.0.1:${process.env.PILOT_SMOKE_PORT || 3000}`; const result = spawnSync('npx',['tsx','src/lab/pilot-smoke.ts', `--baseHost=${baseHost}`],{stdio:'inherit', shell:true}); process.exit(result.status ?? 0);})()\"",
     "pilot:smoke:demo": "tsx src/lab/pilot-smoke-demo.ts",
+    "seed:demo": "tsx src/lab/seed-demo-tenant.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/lab/engine.test.ts",
+    "test:db": "tsx --test src/lab/db.integration.test.ts",
     "eval:local": "tsx src/lab/eval-local.ts",
     "lab:scenarios": "tsx src/lab/eval-local.ts"
   },
   "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
     "dotenv": "^16.6.1",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

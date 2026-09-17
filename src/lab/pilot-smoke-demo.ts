@@ -29,11 +29,19 @@ async function findPort(start: number): Promise<number> {
   const env = {
     ...process.env,
     PORT: String(port),
-    PILOT_SENDERS: process.env.PILOT_SENDERS || 'remetente-demo-A',
-    CHANNEL_BUSINESS_MAP: process.env.CHANNEL_BUSINESS_MAP || 'canal-demo:demo',
     AGENT_CONNECTOR_TOKEN: process.env.AGENT_CONNECTOR_TOKEN || 'token-teste-local',
     PILOT_SMOKE_BASE_HOST: baseHost,
   };
+
+  spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'seed:demo'], {
+    stdio: 'inherit',
+    env: {
+      ...env,
+      SEED_CHANNEL_ACCOUNT_ID: 'canal-demo',
+      SEED_TENANT_SLUG: 'demo',
+      SEED_TENANT_NAME: 'Loja de Demonstração',
+    },
+  });
 
   const cmd = process.platform === 'win32' ? 'cmd.exe' : 'sh';
   const args = process.platform === 'win32' ? ['/c', 'npm run pilot'] : ['-c', 'npm run pilot'];

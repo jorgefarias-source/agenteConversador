@@ -1,5 +1,6 @@
-﻿import { randomUUID } from 'node:crypto';
-import { clearState, getStatePath, loadState, saveState } from './storage';
+import { randomUUID } from 'node:crypto';
+import { query } from '../infra/db';
+import { getRetentionDays } from '../infra/retention';
 
 export interface OutboundItem {
   deliveryId: string;
@@ -14,129 +15,140 @@ export interface OutboundItem {
   createdAt: string;
   claimedUntil?: string;
   claimToken?: string;
+  failureReason?: string;
 }
 
-const outbox = new Map<string, OutboundItem>();
-const initialState = loadState();
-
-for (const item of initialState.outbound) {
-  outbox.set(item.deliveryId, item);
+interface OutboundRow {
+  delivery_id: string;
+  receipt_id: string;
+  message_id: string;
+  channel_account_id: string;
+  sender_id: string;
+  response_text: string;
+  source: OutboundItem['source'];
+  source_version: string;
+  status: OutboundItem['status'];
+  created_at: string;
+  claimed_until: string | null;
+  claim_token: string | null;
+  failure_reason: string | null;
 }
 
-function syncState() {
-  const state = loadState();
-  saveState({
-    ...state,
-    outbound: Array.from(outbox.values()),
-  });
+function toItem(row: OutboundRow): OutboundItem {
+  return {
+    deliveryId: row.delivery_id,
+    receiptId: row.receipt_id,
+    messageId: row.message_id,
+    channelAccountId: row.channel_account_id,
+    senderId: row.sender_id,
+    responseText: row.response_text,
+    source: row.source,
+    sourceVersion: row.source_version,
+    status: row.status,
+    createdAt: row.created_at,
+    claimedUntil: row.claimed_until ?? undefined,
+    claimToken: row.claim_token ?? undefined,
+    failureReason: row.failure_reason ?? undefined,
+  };
 }
 
-export function enqueueOutbound(item: Omit<OutboundItem, 'deliveryId' | 'status' | 'createdAt' | 'claimedUntil'>): OutboundItem {
+export async function enqueueOutbound(
+  tenantId: string,
+  item: Omit<OutboundItem, 'deliveryId' | 'status' | 'createdAt' | 'claimedUntil'>,
+): Promise<OutboundItem> {
   const deliveryId = `del-${randomUUID()}`;
-  const outbound: OutboundItem = {
-    ...item,
-    deliveryId,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  outbox.set(deliveryId, outbound);
-  syncState();
-  return outbound;
+  const [row] = await query<OutboundRow>(
+    `INSERT INTO outbound_messages
+       (tenant_id, delivery_id, receipt_id, message_id, channel_account_id, sender_id, response_text, source, source_version, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+     RETURNING *`,
+    [
+      tenantId,
+      deliveryId,
+      item.receiptId,
+      item.messageId,
+      item.channelAccountId,
+      item.senderId,
+      item.responseText,
+      item.source,
+      item.sourceVersion,
+    ],
+  );
+  return toItem(row);
 }
 
-export function claimOutbound(limitSec = 10): OutboundItem | undefined {
-  const now = Date.now();
-  const entry = [...outbox.values()].find((row) => {
-    if (row.status !== 'pending') {
-      return false;
-    }
-
-    if (!row.claimedUntil) {
-      return true;
-    }
-
-    return new Date(row.claimedUntil).getTime() < now;
-  });
-
-  if (!entry) {
-    return undefined;
-  }
-
-  const updated = {
-    ...entry,
-    claimedUntil: new Date(now + limitSec * 1000).toISOString(),
-    claimToken: randomUUID(),
-  };
-
-  outbox.set(entry.deliveryId, updated);
-  syncState();
-  return updated;
+export async function claimOutbound(claimSeconds = 15, tenantId?: string): Promise<OutboundItem | undefined> {
+  const claimToken = randomUUID();
+  const [row] = await query<OutboundRow>(
+    `UPDATE outbound_messages
+        SET claim_token = $1, claimed_until = now() + ($2 || ' seconds')::interval
+      WHERE id = (
+        SELECT id FROM outbound_messages
+         WHERE status = 'pending' AND (claimed_until IS NULL OR claimed_until < now())
+           AND ($3::uuid IS NULL OR tenant_id = $3::uuid)
+         ORDER BY created_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *`,
+    [claimToken, claimSeconds, tenantId ?? null],
+  );
+  return row ? toItem(row) : undefined;
 }
 
-export type MarkDispatchedResult =
-  | { ok: true; item: OutboundItem }
-  | { ok: false; reason: 'not_found' | 'claim_expired_or_invalid' };
-
-export function markDispatched(deliveryId: string, claimToken: string, success: boolean, reason?: string): MarkDispatchedResult {
-  const row = outbox.get(deliveryId);
-  if (!row) {
+export async function markDispatched(
+  deliveryId: string,
+  claimToken: string,
+  success: boolean,
+  reason?: string,
+): Promise<{ ok: true; item: OutboundItem } | { ok: false; reason: 'not_found' | 'invalid_claim_token' }> {
+  const [existing] = await query<OutboundRow>(`SELECT * FROM outbound_messages WHERE delivery_id = $1`, [deliveryId]);
+  if (!existing) {
     return { ok: false, reason: 'not_found' };
   }
-
-  const stillOwned =
-    row.status === 'pending' &&
-    row.claimToken === claimToken &&
-    !!row.claimedUntil &&
-    new Date(row.claimedUntil).getTime() >= Date.now();
-
-  if (!stillOwned) {
-    return { ok: false, reason: 'claim_expired_or_invalid' };
+  if (existing.claim_token !== claimToken) {
+    return { ok: false, reason: 'invalid_claim_token' };
   }
 
-  const updated: OutboundItem = {
-    ...row,
-    status: success ? 'dispatched' : 'uncertain',
-    claimedUntil: row.claimedUntil,
-  };
-  if (!success) {
-    (updated as any).failureReason = reason ?? 'resultado incerto do conector';
-  }
-
-  outbox.set(deliveryId, updated);
-  syncState();
-  return { ok: true, item: updated };
+  const [row] = await query<OutboundRow>(
+    `UPDATE outbound_messages
+        SET status = $2, failure_reason = $3
+      WHERE delivery_id = $1
+      RETURNING *`,
+    [deliveryId, success ? 'dispatched' : 'uncertain', success ? null : reason ?? 'resultado incerto do conector'],
+  );
+  return { ok: true, item: toItem(row) };
 }
 
-export function pauseBySender(senderId: string): void {
-  let changed = false;
-  for (const [deliveryId, row] of outbox.entries()) {
-    if (row.senderId === senderId && row.status === 'pending') {
-      outbox.set(deliveryId, { ...row, status: 'canceled' });
-      changed = true;
-    }
-  }
-  if (changed) {
-    syncState();
-  }
+export async function pauseBySender(senderId: string): Promise<void> {
+  await query(`UPDATE outbound_messages SET status = 'canceled' WHERE sender_id = $1 AND status = 'pending'`, [senderId]);
 }
 
-export function allOutbound() {
-  return Array.from(outbox.values());
+export async function allOutbound(): Promise<OutboundItem[]> {
+  const rows = await query<OutboundRow>(`SELECT * FROM outbound_messages ORDER BY created_at ASC`);
+  return rows.map(toItem);
 }
 
-export function resetOutbound() {
-  outbox.clear();
-  clearState();
+export async function outboundCount(): Promise<number> {
+  const [row] = await query<{ count: string }>(`SELECT count(*)::text AS count FROM outbound_messages`);
+  return Number(row?.count ?? 0);
 }
 
-export function outboundCount() {
-  return outbox.size;
+export async function outboundPendingCount(): Promise<number> {
+  const [row] = await query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM outbound_messages WHERE status = 'pending'`,
+  );
+  return Number(row?.count ?? 0);
 }
 
-export function outboundPendingCount() {
-  return Array.from(outbox.values()).filter((item) => item.status === 'pending').length;
+export async function purgeExpiredOutbound(): Promise<number> {
+  const rows = await query(
+    `DELETE FROM outbound_messages WHERE created_at < now() - ($1 || ' days')::interval RETURNING id`,
+    [getRetentionDays()],
+  );
+  return rows.length;
 }
 
-export function stateFilePath() {
-  return getStatePath();
+export async function resetOutbound(): Promise<void> {
+  await query('DELETE FROM outbound_messages');
 }

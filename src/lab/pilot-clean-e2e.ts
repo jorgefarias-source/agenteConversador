@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 function getPortPid(port: number): number[] {
   try {
@@ -32,6 +32,12 @@ for (const pid of pids) {
   }
 }
 
+spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'seed:demo'], {
+  cwd: process.cwd(),
+  stdio: 'inherit',
+  env: { ...process.env, SEED_CHANNEL_ACCOUNT_ID: 'canal-demo', SEED_TENANT_SLUG: 'ponto-do-recheio' },
+});
+
 const pilot = spawn(
   process.platform === 'win32' ? 'cmd.exe' : 'npm',
   process.platform === 'win32'
@@ -46,8 +52,6 @@ const pilot = spawn(
       ...process.env,
       APP_MODE: 'pilot',
       AGENT_CONNECTOR_TOKEN: 'token-teste-local',
-      PILOT_SENDERS: 'remetente-demo-A',
-      CHANNEL_BUSINESS_MAP: 'canal-demo:ponto-do-recheio',
       PORT: String(PORT),
     },
   },

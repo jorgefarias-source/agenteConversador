@@ -178,7 +178,7 @@ async function main() {
     { name: 'deduplicacao', pass: duplicate.duplicate === true && duplicate.receipt_id === p1.receipt_id, detail: { p1, duplicate } },
     {
       name: 'claim_e_resultado',
-      pass: !!claim.delivery_id && claim2.status === undefined && statusUpdated,
+      pass: !!claim.delivery_id && !!claim2.delivery_id && claim2.delivery_id !== claim.delivery_id && statusUpdated,
       detail: { claim, claim2, statusUpdated },
     },
     {
@@ -192,11 +192,19 @@ async function main() {
       ),
       detail: { source: claim.source },
     },
-    { name: 'd1_cardapio', pass: p3.delivery_id && String(p3.source_version || '').includes('d1-menu-v1'), detail: { p3 } },
+    {
+      name: 'd1_cardapio',
+      pass: !!p3.delivery_id && !!claim2.delivery_id && String(claim2.source_version || '').includes('d1-menu-v1'),
+      detail: { p3, claim2 },
+    },
     {
       name: 'd1_pedido_autorizado',
-      pass: p4.delivery_id && String(p4.source_version || '').includes('d1-pedido-v1'),
-      detail: { p4 },
+      pass:
+        !!p4.delivery_id &&
+        !!claim3.delivery_id &&
+        String(claim3.source_version || '').includes('d1-pedido-v1') &&
+        !String(claim3.response || '').toLowerCase().includes('não foi possível localizar o pedido'),
+      detail: { p4, claim3 },
     },
     {
       name: 'd1_pedido_somente_do_titular_claim_correspondente',
