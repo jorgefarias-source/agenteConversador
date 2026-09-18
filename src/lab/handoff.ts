@@ -43,16 +43,21 @@ export async function isEscalated(channelAccountId: string, senderId: string): P
   return rows.length > 0;
 }
 
-export async function resolveSender(channelAccountId: string, senderId: string): Promise<boolean> {
+export async function resolveSender(tenantId: string, channelAccountId: string, senderId: string): Promise<boolean> {
   const rows = await query(
-    `DELETE FROM escalations WHERE channel_account_id = $1 AND sender_id = $2 RETURNING id`,
-    [channelAccountId, senderId],
+    `DELETE FROM escalations WHERE tenant_id = $1 AND channel_account_id = $2 AND sender_id = $3 RETURNING id`,
+    [tenantId, channelAccountId, senderId],
   );
   return rows.length > 0;
 }
 
-export async function listEscalated(): Promise<EscalatedSender[]> {
-  const rows = await query<EscalationRow>(`SELECT * FROM escalations ORDER BY escalated_at ASC`);
+export async function listEscalated(tenantId?: string): Promise<EscalatedSender[]> {
+  const rows = await query<EscalationRow>(
+    `SELECT * FROM escalations
+      WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)
+      ORDER BY escalated_at ASC`,
+    [tenantId ?? null],
+  );
   return rows.map(toEscalated);
 }
 
@@ -64,6 +69,6 @@ export async function purgeExpiredEscalations(): Promise<number> {
   return rows.length;
 }
 
-export async function resetEscalations(): Promise<void> {
-  await query('DELETE FROM escalations');
+export async function resetEscalations(tenantId?: string): Promise<void> {
+  await query('DELETE FROM escalations WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)', [tenantId ?? null]);
 }

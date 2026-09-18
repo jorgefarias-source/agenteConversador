@@ -36,7 +36,7 @@ export async function usePostgresAuthState(
     creds,
     keys: {
       get: async (type, ids) => {
-        const result: Record<string, unknown> = {};
+        const result: { [id: string]: SignalDataTypeMap[typeof type] } = {};
         if (ids.length === 0) {
           return result;
         }
@@ -50,7 +50,7 @@ export async function usePostgresAuthState(
           if (type === 'app-state-sync-key' && value) {
             value = proto.Message.AppStateSyncKeyData.fromObject(value as object);
           }
-          result[row.key_id] = value;
+          result[row.key_id] = value as SignalDataTypeMap[typeof type];
         }
         return result;
       },

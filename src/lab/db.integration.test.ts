@@ -1,19 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import dotenv from 'dotenv';
+const testDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
 
-dotenv.config();
-dotenv.config({ path: '.env.local', override: false });
-
-if (!process.env.DATABASE_URL) {
-  test('testes de integração com Postgres pulados (DATABASE_URL ausente)', () => {
-    console.log('DATABASE_URL não definida; pulando testes de integração com o banco.');
+if (!testDatabaseUrl) {
+  test('testes de integração com Postgres pulados (TEST_DATABASE_URL ausente)', () => {
+    console.log('TEST_DATABASE_URL não definida; pulando testes de integração com o banco isolado.');
   });
 } else {
+  process.env.DATABASE_URL = testDatabaseUrl;
   const { runMigrations, query, closePool } = await import('../infra/db');
   const { upsertTenantWithChannel } = await import('../infra/tenants');
-  const { acceptIncoming, purgeExpiredInbound } = await import('./inbox');
-  const { enqueueOutbound, claimOutbound, markDispatched, purgeExpiredOutbound } = await import('./outbox');
+  const { acceptIncoming, inboundCount, purgeExpiredInbound, resetWork } = await import('./inbox');
+  const { allOutbound, enqueueOutbound, claimOutbound, markDispatched, outboundCount, purgeExpiredOutbound, resetOutbound } = await import('./outbox');
   const { escalateSender, isEscalated, resolveSender, listEscalated, purgeExpiredEscalations } = await import('./handoff');
   const { seedPontoDoRecheioMenu } = await import('../infra/seed-customer-data');
   const { getMenuForTenant, resolveOrderForCustomer, listCustomerOrders } = await import('./customer-data');
@@ -23,13 +21,11 @@ if (!process.env.DATABASE_URL) {
   const suffix = Date.now();
   const channelAccountId = `canal-teste-${suffix}`;
   const tenant = await upsertTenantWithChannel(`tenant-teste-${suffix}`, 'Tenant de Teste', channelAccountId);
+  const otherChannelAccountId = `canal-teste-outro-${suffix}`;
+  const otherTenant = await upsertTenantWithChannel(`tenant-teste-outro-${suffix}`, 'Outro Tenant de Teste', otherChannelAccountId);
 
   test.after(async () => {
-    await query('DELETE FROM escalations WHERE tenant_id = $1', [tenant.id]);
-    await query('DELETE FROM outbound_messages WHERE tenant_id = $1', [tenant.id]);
-    await query('DELETE FROM inbound_messages WHERE tenant_id = $1', [tenant.id]);
-    await query('DELETE FROM tenant_channels WHERE tenant_id = $1', [tenant.id]);
-    await query('DELETE FROM tenants WHERE id = $1', [tenant.id]);
+    await query('DELETE FROM tenants WHERE id = ANY($1::uuid[])', [[tenant.id, otherTenant.id]]);
     await closePool();
   });
 
@@ -97,6 +93,37 @@ if (!process.env.DATABASE_URL) {
     assert.equal(result.ok, false);
   });
 
+  test('operações operacionais ficam isoladas por tenant', async () => {
+    await acceptIncoming(otherTenant.id, {
+      schema_version: '1',
+      message_id: `msg-other-${suffix}`,
+      channel_account_id: otherChannelAccountId,
+      sender_id: 'remetente-compartilhado',
+      sent_at: new Date().toISOString(),
+      type: 'text',
+      text: 'Mensagem do outro tenant',
+    });
+    await enqueueOutbound(otherTenant.id, {
+      receiptId: `rec-other-${suffix}`,
+      messageId: `msg-out-other-${suffix}`,
+      channelAccountId: otherChannelAccountId,
+      senderId: 'remetente-compartilhado',
+      responseText: 'Resposta do outro tenant',
+      source: 'faq-matched',
+      sourceVersion: 'faq-v1',
+    });
+
+    assert.equal(await inboundCount(otherTenant.id), 1);
+    assert.equal(await outboundCount(otherTenant.id), 1);
+    assert.equal((await allOutbound(tenant.id)).some((item) => item.channelAccountId === otherChannelAccountId), false);
+
+    await resetWork(tenant.id);
+    await resetOutbound(tenant.id);
+
+    assert.equal(await inboundCount(otherTenant.id), 1, 'reset do tenant A não pode apagar inbound do tenant B');
+    assert.equal(await outboundCount(otherTenant.id), 1, 'reset do tenant A não pode apagar outbox do tenant B');
+  });
+
   test('handoff: escalar, listar, suprimir e resolver', async () => {
     await escalateSender(tenant.id, channelAccountId, 'remetente-escalado', 'não sei responder');
     assert.equal(await isEscalated(channelAccountId, 'remetente-escalado'), true);
@@ -104,7 +131,7 @@ if (!process.env.DATABASE_URL) {
     const pending = await listEscalated();
     assert.ok(pending.some((item) => item.senderId === 'remetente-escalado' && item.channelAccountId === channelAccountId));
 
-    const resolved = await resolveSender(channelAccountId, 'remetente-escalado');
+    const resolved = await resolveSender(tenant.id, channelAccountId, 'remetente-escalado');
     assert.equal(resolved, true);
     assert.equal(await isEscalated(channelAccountId, 'remetente-escalado'), false);
   });

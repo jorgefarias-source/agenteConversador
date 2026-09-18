@@ -8,20 +8,29 @@ etc.) à API do Conversador — o motor central de atendimento via WhatsApp.
 Toda chamada autenticada leva o header:
 
 ```
-Authorization: Bearer <AGENT_CONNECTOR_TOKEN>
+Authorization: Bearer <TOKEN_DA_INTEGRACAO>
 ```
 
-Em produção, esse token vive só na variável de ambiente do serviço no Railway — nunca commitado,
-nunca hardcoded no sistema que consome a API. Peça o token de produção separadamente.
+Cada sistema cliente recebe uma credencial própria, vinculada ao seu tenant e limitada por
+escopos. O token deve ficar no backend do sistema cliente, nunca no navegador, no repositório
+ou em logs. O `AGENT_CONNECTOR_TOKEN` é reservado à administração interna do Conversador e
+não deve ser compartilhado com sistemas clientes.
 
-## 1) Cadastrar um cliente novo e conectar o WhatsApp dele
+Escopos disponíveis: `messages:write`, `handoff:read`, `handoff:write`, `config:read`,
+`config:write`, `whatsapp:read`, `whatsapp:write`, `observability:read`,
+`observability:reset` e `outbound:write`.
+
+## 1) Cadastrar um cliente novo e emitir sua credencial
 
 Cada cliente final (ex: um petshop específico) vira um **tenant** no Conversador, identificado
 por um `channel_account_id` (um identificador único que você escolhe — pode ser o ID do cliente
 no seu próprio sistema).
 
+O cadastro inicial do tenant e do canal é uma operação administrativa:
+
 ```http
 POST /v1/whatsapp/connections
+Authorization: Bearer <AGENT_CONNECTOR_TOKEN_ADMINISTRATIVO>
 Content-Type: application/json
 
 {
@@ -31,11 +40,33 @@ Content-Type: application/json
 }
 ```
 
-Isso cria o tenant (se não existir) e começa a tentar conectar o WhatsApp. A resposta traz o
-status inicial. Em seguida:
+Depois, a administração emite a credencial do sistema cliente. O token em texto puro aparece
+uma única vez nessa resposta:
+
+```http
+POST /v1/admin/tenants/petshop-123/credentials
+Authorization: Bearer <AGENT_CONNECTOR_TOKEN_ADMINISTRATIVO>
+Content-Type: application/json
+
+{
+  "name": "backend-petshop-123",
+  "scopes": ["messages:write", "handoff:read", "handoff:write", "config:read", "config:write", "whatsapp:read", "whatsapp:write", "observability:read"]
+}
+```
+
+Para revogar:
+
+```http
+DELETE /v1/admin/tenants/petshop-123/credentials/:credential_id
+Authorization: Bearer <AGENT_CONNECTOR_TOKEN_ADMINISTRATIVO>
+```
+
+O cadastro também começa a tentar conectar o WhatsApp. A resposta traz o status inicial. Com a
+credencial do tenant, consulte:
 
 ```http
 GET /v1/whatsapp/connections/petshop-123/status
+Authorization: Bearer <TOKEN_DA_INTEGRACAO>
 ```
 
 Retorna `{"status": "qr_pending" | "connecting" | "connected" | "disconnected", "hasQr": bool}`.
@@ -156,9 +187,8 @@ final (ex: o petshop) deve ver essa fila **dentro do próprio sistema dele**, co
 GET /v1/handoff/pending
 ```
 
-Retorna todas as conversas escaladas de todos os tenants — filtre pelo `channel_account_id` do
-seu cliente no seu sistema antes de exibir (ainda não há filtro por tenant nesse endpoint, ver
-seção de limitações abaixo).
+Retorna somente as conversas escaladas do tenant vinculado à credencial apresentada. O servidor
+faz esse isolamento; o sistema cliente não deve depender de filtragem no frontend.
 
 Para liberar/resolver uma conversa (atendente respondeu manualmente):
 
@@ -182,8 +212,6 @@ POST /v1/tenants/petshop-123/pilot-senders
 
 ## Limitações conhecidas (a resolver conforme necessidade)
 
-- `GET /v1/handoff/pending` não filtra por tenant — devolve a fila de todo mundo. Filtre no seu
-  sistema por enquanto, ou peça para adicionarmos um parâmetro de filtro.
 - Cardápio/pedidos não têm API própria de cadastro por tenant ainda (só FAQ tem).
 - Não há painel de configuração dentro do próprio Conversador para o cliente final — a intenção é
   que cada sistema (PetShop, Mordomê...) construa sua própria tela de configuração usando esta

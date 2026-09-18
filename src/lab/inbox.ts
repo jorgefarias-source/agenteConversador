@@ -80,13 +80,22 @@ export async function acceptIncoming(tenantId: string, payload: IncomingMessageP
   return toWork(row);
 }
 
-export async function allWork(): Promise<PersistedWork[]> {
-  const rows = await query<InboundRow>(`SELECT * FROM inbound_messages ORDER BY received_at ASC`);
+export async function allWork(tenantId?: string): Promise<PersistedWork[]> {
+  const rows = await query<InboundRow>(
+    `SELECT * FROM inbound_messages
+      WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)
+      ORDER BY received_at ASC`,
+    [tenantId ?? null],
+  );
   return rows.map(toWork);
 }
 
-export async function inboundCount(): Promise<number> {
-  const [row] = await query<{ count: string }>(`SELECT count(*)::text AS count FROM inbound_messages`);
+export async function inboundCount(tenantId?: string): Promise<number> {
+  const [row] = await query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM inbound_messages
+      WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)`,
+    [tenantId ?? null],
+  );
   return Number(row?.count ?? 0);
 }
 
@@ -98,6 +107,6 @@ export async function purgeExpiredInbound(): Promise<number> {
   return rows.length;
 }
 
-export async function resetWork(): Promise<void> {
-  await query('DELETE FROM inbound_messages');
+export async function resetWork(tenantId?: string): Promise<void> {
+  await query('DELETE FROM inbound_messages WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)', [tenantId ?? null]);
 }

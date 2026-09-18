@@ -101,8 +101,13 @@ export async function markDispatched(
   claimToken: string,
   success: boolean,
   reason?: string,
+  tenantId?: string,
 ): Promise<{ ok: true; item: OutboundItem } | { ok: false; reason: 'not_found' | 'invalid_claim_token' }> {
-  const [existing] = await query<OutboundRow>(`SELECT * FROM outbound_messages WHERE delivery_id = $1`, [deliveryId]);
+  const [existing] = await query<OutboundRow>(
+    `SELECT * FROM outbound_messages
+      WHERE delivery_id = $1 AND ($2::uuid IS NULL OR tenant_id = $2::uuid)`,
+    [deliveryId, tenantId ?? null],
+  );
   if (!existing) {
     return { ok: false, reason: 'not_found' };
   }
@@ -113,30 +118,46 @@ export async function markDispatched(
   const [row] = await query<OutboundRow>(
     `UPDATE outbound_messages
         SET status = $2, failure_reason = $3
-      WHERE delivery_id = $1
+      WHERE delivery_id = $1 AND ($4::uuid IS NULL OR tenant_id = $4::uuid)
       RETURNING *`,
-    [deliveryId, success ? 'dispatched' : 'uncertain', success ? null : reason ?? 'resultado incerto do conector'],
+    [deliveryId, success ? 'dispatched' : 'uncertain', success ? null : reason ?? 'resultado incerto do conector', tenantId ?? null],
   );
   return { ok: true, item: toItem(row) };
 }
 
-export async function pauseBySender(senderId: string): Promise<void> {
-  await query(`UPDATE outbound_messages SET status = 'canceled' WHERE sender_id = $1 AND status = 'pending'`, [senderId]);
+export async function pauseBySender(tenantId: string, channelAccountId: string, senderId: string): Promise<void> {
+  await query(
+    `UPDATE outbound_messages
+        SET status = 'canceled'
+      WHERE tenant_id = $1 AND channel_account_id = $2 AND sender_id = $3 AND status = 'pending'`,
+    [tenantId, channelAccountId, senderId],
+  );
 }
 
-export async function allOutbound(): Promise<OutboundItem[]> {
-  const rows = await query<OutboundRow>(`SELECT * FROM outbound_messages ORDER BY created_at ASC`);
+export async function allOutbound(tenantId?: string): Promise<OutboundItem[]> {
+  const rows = await query<OutboundRow>(
+    `SELECT * FROM outbound_messages
+      WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)
+      ORDER BY created_at ASC`,
+    [tenantId ?? null],
+  );
   return rows.map(toItem);
 }
 
-export async function outboundCount(): Promise<number> {
-  const [row] = await query<{ count: string }>(`SELECT count(*)::text AS count FROM outbound_messages`);
+export async function outboundCount(tenantId?: string): Promise<number> {
+  const [row] = await query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM outbound_messages
+      WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)`,
+    [tenantId ?? null],
+  );
   return Number(row?.count ?? 0);
 }
 
-export async function outboundPendingCount(): Promise<number> {
+export async function outboundPendingCount(tenantId?: string): Promise<number> {
   const [row] = await query<{ count: string }>(
-    `SELECT count(*)::text AS count FROM outbound_messages WHERE status = 'pending'`,
+    `SELECT count(*)::text AS count FROM outbound_messages
+      WHERE status = 'pending' AND ($1::uuid IS NULL OR tenant_id = $1::uuid)`,
+    [tenantId ?? null],
   );
   return Number(row?.count ?? 0);
 }
@@ -149,6 +170,6 @@ export async function purgeExpiredOutbound(): Promise<number> {
   return rows.length;
 }
 
-export async function resetOutbound(): Promise<void> {
-  await query('DELETE FROM outbound_messages');
+export async function resetOutbound(tenantId?: string): Promise<void> {
+  await query('DELETE FROM outbound_messages WHERE ($1::uuid IS NULL OR tenant_id = $1::uuid)', [tenantId ?? null]);
 }
